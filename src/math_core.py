@@ -14,15 +14,14 @@ def xirr_custom(dates, cashflows, guess=0.1):
         if r <= -1.0: return float('inf')
         return sum(cf / (1 + r)**y for cf, y in zip(cashflows, years))
 
-    # --- MOIC-Anchored CAGR Initialization Target Heuristic ---
     pos_cf = sum(cf for cf in cashflows if cf > 0)
     neg_cf = sum(-cf for cf in cashflows if cf < 0)
     if neg_cf == 0: return np.nan
-    
+
     moic = pos_cf / neg_cf
     total_years = years[-1] if years[-1] > 0 else 1
     smart_guess = (moic ** (1 / total_years)) - 1 if moic > 0 else -0.99
-    
+
     guesses = [smart_guess, guess, 0.0, -0.01, 0.01, -0.1, 0.1, -0.5, 0.5, -0.9]
     tried = set()
     valid_roots = []
@@ -37,11 +36,10 @@ def xirr_custom(dates, cashflows, guess=0.1):
                     valid_roots.append(res)
         except Exception:
             continue
-            
+
     if not valid_roots: return np.nan
     best_root = min(valid_roots, key=lambda r: abs(r - smart_guess))
-    
-    # GIPS Compliance Intercept Boundary Constraint
+
     total_days = (dates[-1] - dates[0]).days
     if 0 < total_days < 365:
         return (1 + best_root) ** (total_days / 365.0) - 1
@@ -63,37 +61,32 @@ def get_period_twr(df, ret_col, end_date, date_col='Date', ytd=False, years=None
     if ytd:
         start_date = pd.to_datetime(f"{end_date.year - 1}-12-31")
     elif years is not None:
-        # INTERCEPT FOR FRACTIONAL QUARTERLY HORIZONS (0.25 YEARS)
-        # Prevents dateutil/pandas ValueErrors on public cloud deployment containers
+        # fractional quarter adjustment intercept to clear cloud container deployment crashes
         if years == 0.25:
             start_date = end_date - pd.DateOffset(months=3)
         else:
             start_date = end_date - pd.DateOffset(years=int(years))
     else:
         return np.nan
-        
+
     mask = (df[date_col] > start_date) & (df[date_col] <= end_date)
     period_df = df[mask]
     if period_df.empty: return np.nan
+
     if years and years > 1:
-        if len(period_df) < (years * 4) - 1: return np.nan 
-            
+        if len(period_df) < (years * 4) - 1: return np.nan
+
     cum_ret = chain_link(period_df[ret_col])
     if years and years > 1:
         return (1 + cum_ret) ** (1.0 / years) - 1 if cum_ret >= -1.0 else -1.0
     return cum_ret
 
 def calc_6_components(df):
-    """Deconstructs net accounting variables down to 6 components with resilient column checks."""
+    """Deconstructs net accounting variables down to 6 distinct sub-period components."""
     if df.empty: return df
     df['Denominator'] = df['Denominator'].replace(0, np.nan)
-    
-    # Schema-Resilient Column Intercept Layer
-    income_col = 'Gross Investment Income Minus JV Fees' if 'Gross Investment Income Minus JV Fees' in df.columns else 'Gross Investment Income Minus Fees'
-    app_col = 'Gross Appreciation' if 'Gross Appreciation' in df.columns else 'Total Gross Appreciation'
-    
-    df['Gross Income Return'] = df[income_col] / df['Denominator']
-    df['Gross Appreciation Return'] = df[app_col] / df['Denominator']
+    df['Gross Income Return'] = df['Gross Investment Income Minus Fees'] / df['Denominator']
+    df['Gross Appreciation Return'] = df['Total Gross Appreciation'] / df['Denominator']
     df['Gross Total Return'] = df['Gross Income Return'].fillna(0) + df['Gross Appreciation Return'].fillna(0)
     df['Net Income Return'] = df['Net Investment Income'] / df['Denominator']
     df['Net Appreciation Return'] = df['Net Appreciation'] / df['Denominator']
