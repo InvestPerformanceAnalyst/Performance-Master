@@ -54,7 +54,6 @@ with tab_engine:
     st.markdown("## Interactive Calculation Sandbox")
     st.write("Test the calculation engine below. View raw input columns live on screen, monitor real-time standard output console statuses, and extract compiled performance deliverables.")
     
-    # Target directory path for pre-loaded repository files
     DEMO_FILE_PATH = "data/Performance_Master_Sample_Inputs.xlsx"
     
     st.sidebar.markdown("### 📥 Source File Settings")
@@ -69,17 +68,8 @@ with tab_engine:
         if os.path.exists(DEMO_FILE_PATH):
             try:
                 with open(DEMO_FILE_PATH, "rb") as f:
-                    file_data = f.read()
-                
-                # Intercept Git LFS text shortcuts before passing to zip compressors
-                if b"version https://git-lfs" in file_data[:100]:
-                    st.error("❌ **Git LFS Mirror Pointer Error Detected!** \n\n"
-                             "The pre-loaded demo spreadsheet file inside your GitHub repository is currently stored as a text shortcut link "
-                             "instead of a binary Excel file. To fix this, deactivate Git LFS for this file or upload the binary file directly using "
-                             "the **'Upload Custom Master Workbook'** toggle to run the sandbox calculations.")
-                else:
-                    active_bytes = file_data
-                    st.success("✅ Connected to repository demo file (`Performance_Master_Sample_Inputs.xlsx`).")
+                    active_bytes = f.read()
+                st.success("✅ Connected to repository demo file reference folder.")
             except Exception as e:
                 st.error(f"Error accessing repository file path: {str(e)}")
         else:
@@ -91,12 +81,11 @@ with tab_engine:
             st.success("📊 Custom workbook successfully bridged into server RAM.")
 
     if active_bytes is not None:
+        # --- DEFENSIVE INGESTION WITH RESTORED PREVIEWER BACK-STOP ---
         try:
-            # Initialize Excel interface directly out of stateless binary arrays
             xls = pd.ExcelFile(io.BytesIO(active_bytes), engine='openpyxl')
             sheets = xls.sheet_names
             
-            # --- THE RESTORED RAW DATABASE SNEAK-PEAK INSPECTOR ---
             st.write("---")
             st.markdown("### 🔎 The Accounting Chaos: Live Raw Data Inspector")
             st.markdown(
@@ -105,16 +94,12 @@ with tab_engine:
             )
             
             sheet_select = st.selectbox("Select a raw accounting ledger tab to inspect:", sheets)
-            
-            # Read and display the raw DataFrame head immediately to establish the contrast
             raw_df = pd.read_excel(xls, sheet_select)
             st.dataframe(raw_df.head(20), use_container_width=True)
             st.caption(f"📊 Showing first 20 records of raw data tab '{sheet_select}' (Total Dimensions: {raw_df.shape[0]} rows × {raw_df.shape[1]} columns).")
-            # ------------------------------------------------------
-                
+            
             st.write("---")
             st.markdown("### ⚙️ Assemble Financial Workbook Models")
-            st.write("Clicking the execution trigger hooks standard print handles, passes the raw frames into your decoupled packages, and generates an institutional deliverable workbook inside system memory:")
             
             if st.button("Execute Portfolio Engine"):
                 st.markdown("#### 🖥️ Active Server Terminal Log Stream")
@@ -182,5 +167,16 @@ with tab_engine:
                     st.error(f"Environmental Compilation Failure: {str(e)}")
                     import traceback
                     st.code(traceback.format_exc())
+                    
         except Exception as e:
-            st.error(f"File Reader Error: Your workbook could not be decoded. {str(e)}")
+            # INTERCEPT CORRUPTED FILES AND EXPOSE CONTENTS LIVE FOR REVIEW
+            text_peek = active_bytes[:500].decode('utf-8', errors='ignore')
+            st.error(f"❌ **File Ingestion Error: Not a Genuine Excel Workbook!**")
+            st.markdown(
+                f"The underlying file structure could not be mapped to zip compression tables. "
+                f"Here are the first 500 characters of the raw data that was actually read from disk:\n"
+                f"```text\n{text_peek}\n```\n"
+                f"**Diagnostic Verdict:** If the text lookahead contains `<!DOCTYPE html>` or `github.com`, you have saved a webpage markup "
+                f"by mistake. If it lists a `sha256` hash or an `oid`, Git LFS has locked the asset as an un-fetched pointer on GitHub. "
+                f"Overwrite this file inside your repository with your valid local binary spreadsheet to clear the system cache."
+            )
