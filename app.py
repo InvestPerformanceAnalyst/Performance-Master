@@ -33,7 +33,7 @@ tab_brief, tab_code, tab_engine = st.tabs(["📋 Platform Vision & Capabilities"
 with tab_brief:
     st.markdown("## Bridging the Gap: From Back-Office Chaos to Front-Office Intelligence")
     st.write(
-        "In institutional real equity private equity, asset surveillance is frequently bottlenecked by unstructured "
+        "In institutional real estate private equity, asset surveillance is frequently bottlenecked by unstructured "
         "transaction ledgers, joint-venture partner accounting variations, and fractured history tracking. This platform "
         "is a custom-engineered financial solution designed to scale performance analytics and deliver **clear, actionable intelligence** "
         "directly into the hands of portfolio managers and senior decision-makers."
@@ -75,15 +75,35 @@ with tab_brief:
     st.dataframe(get_disclosures(), use_container_width=True, hide_index=True)
 
 # ---------------------------------------------------------------------
-# TAB 2: SOURCE CODE ACCESSIBILITY SYNTAX SHOWCASE
+# TAB 2: SOURCE CODE ACCESSIBILITY SYNTAX SHOWCASE (WITH PAYWALL EFFECT)
 # ---------------------------------------------------------------------
 with tab_code:
     st.markdown("## Production Source Syntax Pipeline Preview")
     st.write("Examine the clean engineering implementation design paradigms of the decoupled backend modules:")
     src_module = st.selectbox("Select a file block to review syntax structure:", ["src/math_core.py", "src/summary_engine.py", "src/analytics_engine.py", "src/excel_exporter.py"])
+    
+    # RESTORED / ENHANCED: PAYWALL SNEAK-PEEK GRADUAL MOSAIC BLUR EFFECT
     try:
         with open(src_module, "r") as f:
-            st.code(f.read(), language="python")
+            code_lines = f.readlines()
+        
+        if len(code_lines) <= 80:
+            st.code("".join(code_lines), language="python")
+        else:
+            # Render first 80 rows natively inside standard code module block
+            st.code("".join(code_lines[:80]), language="python")
+            
+            st.markdown("#### 🔒 RECRUITER PREMIUM INFRASTRUCTURE SNEAK-PEEK")
+            # Injecting smooth CSS linear gradient masking and font blur to simulate Wall Street Journal paywall overlays
+            paywall_markup = (
+                "<div style='background: linear-gradient(to bottom, #000000 0%, rgba(0,0,0,0) 100%); "
+                "-webkit-background-clip: text; -webkit-text-fill-color: transparent; font-family: monospace; "
+                "font-size: 14px; white-space: pre; overflow: hidden; max-height: 180px; user-select: none; "
+                "line-height: 1.4; opacity: 0.30; filter: blur(3.5px); pointer-events: none;'>"
+                + "".join(code_lines[80:115]).replace("<", "&lt;").replace(">", "&gt;") + "</div>"
+            )
+            st.markdown(paywall_markup, unsafe_allow_html=True)
+            st.warning("💼 **Recruiter Notice:** Advanced production calculations, multi-period attribution frameworks, and specialized charting architecture layers are restricted to simulate proprietary institutional software. **Hire Sai Yin Ye to unlock core infrastructure architecture rights.**")
     except FileNotFoundError:
         st.info(f"Save '{src_module}' into your working directory folder tree to parse lines live here.")
 
@@ -103,7 +123,6 @@ with tab_engine:
     )
     
     active_bytes = None
-    
     if "Pre-loaded" in data_source:
         if os.path.exists(DEMO_FILE_PATH):
             try:
@@ -113,8 +132,7 @@ with tab_engine:
                 if b"version https://git-lfs" in file_data[:100]:
                     st.error("❌ **Git LFS Mirror Pointer Error Detected!** \n\n"
                              "The pre-loaded demo spreadsheet file inside your GitHub repository is currently stored as a text shortcut link "
-                             "instead of a binary Excel file. To fix this, deactivate Git LFS for this file or upload the binary file directly using "
-                             "the **'Upload Custom Master Workbook'** toggle to run the sandbox calculations.")
+                             "instead of a binary Excel file. Upload the binary file directly using **'Upload Custom Master Workbook'**.")
                 else:
                     active_bytes = file_data
                     st.success("✅ Connected to repository demo file (`Performance_Master_Sample_Inputs.xlsx`).")
@@ -142,12 +160,42 @@ with tab_engine:
             
             sheet_select = st.selectbox("Select a raw accounting ledger tab to inspect:", sheets)
             raw_df = pd.read_excel(xls, sheet_select)
+            
+            # --- FEATURE ADDED: 2. DYNAMIC WORKBOOK SCALING SUMMARY MATRIX PROFILE ---
+            total_rows_parsed = 0
+            unique_assets = 0
+            unique_composites = 0
+            
+            for sheet_name in sheets:
+                try:
+                    temp_df = pd.read_excel(io.BytesIO(active_bytes), sheet_name=sheet_name, engine='openpyxl')
+                    total_rows_parsed += temp_df.shape[0]
+                    if sheet_name == 'Cashflow' and 'Entity Name' in temp_df.columns:
+                        unique_assets = temp_df['Entity Name'].nunique()
+                    if sheet_name == 'Configuration' and 'Composite Grouping' in temp_df.columns:
+                        unique_composites = temp_df['Composite Grouping'].nunique()
+                except Exception: pass
+            
+            if unique_assets == 0 and 'Entity Name' in raw_df.columns:
+                unique_assets = raw_df['Entity Name'].nunique()
+
+            st.markdown("#### ⚡ Real-Time Processing System Profile")
+            m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+            with m_col1:
+                st.metric(label="Ingested Database Tabs", value=f"{len(sheets)} Active Sheets")
+            with m_col2:
+                st.metric(label="Surveilled Positions", value=f"{unique_assets} Unique Entities")
+            with m_col3:
+                st.metric(label="Structured Rollups", value=f"{unique_composites} Fund Composites")
+            with m_col4:
+                st.metric(label="Total Inbound Matrix Size", value=f"{total_rows_parsed:,} Rows")
+            # --------------------------------------------------------------------------
+
             st.dataframe(raw_df.head(20), use_container_width=True)
-            st.caption(f"📊 Showing first 20 records of raw data tab '{sheet_select}' (Total Dimensions: {raw_df.shape[0]} rows × {raw_df.shape[1]} columns).")
+            st.caption(f"📊 Showing top 20 records of tab '{sheet_select}' (Current Sheet Dimensions: {raw_df.shape[0]} rows × {raw_df.shape[1]} columns).")
                 
             st.write("---")
             st.markdown("### ⚙️ Assemble Financial Workbook Models")
-            st.write("Clicking the execution trigger hooks standard print handles, passes the raw frames into your decoupled packages, and generates an institutional deliverable workbook inside system memory:")
             
             if st.button("Execute Portfolio Engine"):
                 st.markdown("#### 🖥️ Active Server Terminal Log Stream")
