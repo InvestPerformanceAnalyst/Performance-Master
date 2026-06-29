@@ -1,5 +1,5 @@
 # =====================================================================
-# MODULE 4: EXCEL EXPORT ENGINE WITH IN-MEMORY BYTES WRITER REDIRECTION
+# MODULE 4: SPREADSHEET AUTOMATION & COMPILER LAYER
 # =====================================================================
 import math
 import pandas as pd
@@ -34,7 +34,6 @@ def export_to_excel(excel_io, master_df, active_days_df, irr_val_df, twr_aggrega
                     best_waste, best_N_top, best_N_bot, best_p_unit, best_s_unit = waste, N_top, N_bot, p_u, s_u
         return best_p_unit * best_N_top, -best_p_unit * best_N_bot, best_p_unit, 1000 + best_s_unit * best_N_top, 1000 - best_s_unit * best_N_bot, best_s_unit
 
-    # MODIFIED: Target abstract in-memory byte streams natively
     with pd.ExcelWriter(excel_io, engine='xlsxwriter', engine_kwargs={'options': {'nan_inf_to_errors': True}}) as writer:
         workbook = writer.book
 
@@ -46,7 +45,7 @@ def export_to_excel(excel_io, master_df, active_days_df, irr_val_df, twr_aggrega
 
         date_format = workbook.add_format({'num_format': 'yyyy-mm-dd', 'align': 'center'})
         money_round_fmt = workbook.add_format({'num_format': '$#,##0', 'align': 'right'})
-        pct_raw_format = workbook.add_format({'num_format': '0.00%', 'align': 'right'})
+        print_pct_raw = workbook.add_format({'num_format': '0.00%', 'align': 'right'})
         f_val_green = workbook.add_format({'num_format': '0.00%', 'align': 'right', 'font_color': '#00B050', 'bold': True})
         f_val_red = workbook.add_format({'num_format': '0.00%', 'align': 'right', 'font_color': '#C0504D', 'bold': True})
 
@@ -201,7 +200,7 @@ def export_to_excel(excel_io, master_df, active_days_df, irr_val_df, twr_aggrega
                     ce.set_y2_axis({'name': 'Growth of $1,000', 'min': s_min, 'max': s_max, 'major_unit': s_unit, 'crossing': s_min})
                     ce.set_size({'width': 750, 'height': 400}); ce.set_legend({'position': 'bottom'})
                     ws_eb.insert_chart(d_start - 2, len(ents) + 4, ce); r += 3
-                except Exception: pass
+                except Exception as e: pass
 
         # 6. QUARTERLY RETURN COMPONENTS (DISTRIBUTION)
         if final_return_distributions:
@@ -218,7 +217,7 @@ def export_to_excel(excel_io, master_df, active_days_df, irr_val_df, twr_aggrega
                     r += 1; d_start = r
 
                     for _, row in rd.iterrows():
-                        ws_rd.write(r, 0, row['Date'], date_format); ws_rd.write(r, 1, row['Gross Income Return'], pct_raw_format); ws_rd.write(r, 2, row['BM_Inc_Ret'], pct_raw_format); ws_rd.write(r, 3, row['Gross Appreciation Return'], pct_raw_format); ws_rd.write(r, 4, row['BM_App_Ret'], pct_raw_format); r += 1
+                        ws_rd.write(r, 0, row['Date'], date_format); ws_rd.write(r, 1, row['Gross Income Return'], print_pct_raw); ws_rd.write(r, 2, row['BM_Inc_Ret'], print_pct_raw); ws_rd.write(r, 3, row['Gross Appreciation Return'], print_pct_raw); ws_rd.write(r, 4, row['BM_App_Ret'], print_pct_raw); r += 1
 
                     c_inc = workbook.add_chart({'type': 'column'})
                     c_inc.add_series({'name': ['Quarterly Return Components', d_start - 1, 1], 'categories': ['Quarterly Return Components', d_start, 0, r - 1, 0], 'values': ['Quarterly Return Components', d_start, 1, r - 1, 1], 'fill': {'color': col_comp_inc}, 'gap': 30})
@@ -266,7 +265,7 @@ def export_to_excel(excel_io, master_df, active_days_df, irr_val_df, twr_aggrega
 
             for cm in corr_matrices:
                 try:
-                    c_name, mat, bm_name = cm['Composite Name'], cm['Matrix'], cm['Benchmark Name']
+                    c_name, mat, _ = cm['Composite Name'], cm['Matrix'], cm['Benchmark Name']
                     ws_rc.write(r, 0, f"{c_name} - Cross-Correlation Matrix", fmt_bd_title); r += 1
                     for c, h in enumerate(['Entity'] + list(mat.columns)): ws_rc.write(r, c, h, fmt_bd_header)
                     r += 1; start_r = r
@@ -282,34 +281,86 @@ def export_to_excel(excel_io, master_df, active_days_df, irr_val_df, twr_aggrega
         if not trailing_pivot.empty:
             trailing_pivot.to_excel(writer, sheet_name='Trailing IRR Chart', index=False)
             ws_tc = writer.sheets['Trailing IRR Chart']
-            ws_tc.set_column('A:A', 15, date_format); ws_tc.set_column('B:Z', 25, pct_raw_format)
+            ws_tc.set_column('A:A', 15, date_format); ws_tc.set_column('B:Z', 25, print_pct_raw)
             chart_tc = workbook.add_chart({'type': 'line'})
             for i, c in enumerate(trailing_pivot.columns[1:], start=1): chart_tc.add_series({'name': ['Trailing IRR Chart', 0, i], 'categories': ['Trailing IRR Chart', 1, 0, len(trailing_pivot), 0], 'values': ['Trailing IRR Chart', 1, i, len(trailing_pivot), i]})
             ws_tc.insert_chart('I2', chart_tc)
 
-        # 9. ENTITY TRAILING IRR
+        # --- RESTORED FEATURE: 9. ENTITY TRAILING IRR CHARTING INTERFACE ---
         if not ent_pivot.empty:
             ent_pivot.to_excel(writer, sheet_name='Entity Trailing IRR', index=False)
             ws_ec = writer.sheets['Entity Trailing IRR']
-            ws_ec.set_column('A:A', 15, date_format); ws_ec.set_column('B:Z', 25, pct_raw_format)
+            ws_ec.set_column('A:A', 15, date_format)
+            ws_ec.set_column('B:ZZ', 18, print_pct_raw)
+            
+            chart_ec = workbook.add_chart({'type': 'line'})
+            for i, ent_col in enumerate(ent_pivot.columns[1:], start=1):
+                chart_ec.add_series({
+                    'name': ['Entity Trailing IRR', 0, i],
+                    'categories': ['Entity Trailing IRR', 1, 0, len(ent_pivot), 0],
+                    'values': ['Entity Trailing IRR', 1, i, len(ent_pivot), i],
+                    'line': {'width': 2.0}
+                })
+            chart_ec.set_title({'name': 'Historical Entity-Level Trailing Gross IRR Trend Matrix', 'name_font': {'size': 13, 'bold': True}})
+            chart_ec.set_x_axis({'name': 'Timeline Axis', 'date_axis': True})
+            chart_ec.set_y_axis({'name': 'Gross IRR (%)', 'num_format': '0.00%', 'major_gridlines': {'visible': True, 'line': {'color': '#EFEFEF', 'dash_type': 'dash'}}})
+            chart_ec.set_size({'width': 960, 'height': 520})
+            ws_ec.insert_chart('I2', chart_ec)
 
-        # 10. J CURVE
+        # --- RESTORED FEATURE: 10. J CURVE VALUE CREATION GRAPHING core ---
         if not j_curve_export.empty:
             j_curve_export.to_excel(writer, sheet_name='J Curve', index=False)
             ws_j = writer.sheets['J Curve']
-            ws_j.set_column('A:A', 12, date_format); ws_j.set_column('B:G', 18, money_round_fmt)
+            ws_j.set_column('A:A', 15, date_format)
+            ws_j.set_column('B:G', 18, money_round_fmt)
+            
+            chart_j = workbook.add_chart({'type': 'line'})
+            chart_j.add_series({
+                'name': ['J Curve', 0, 5],
+                'categories': ['J Curve', 1, 0, len(j_curve_export), 0],
+                'values': ['J Curve', 1, 5, len(j_curve_export), 5],
+                'line': {'color': '#C0504D', 'width': 2.5}
+            })
+            chart_j.add_series({
+                'name': ['J Curve', 0, 6],
+                'categories': ['J Curve', 1, 0, len(j_curve_export), 0],
+                'values': ['J Curve', 1, 6, len(j_curve_export), 6],
+                'line': {'color': '#9BBB59', 'width': 2.5, 'dash_type': 'dash'}
+            })
+            chart_j.set_title({'name': 'Total Portfolio Value Creation (J-Curve Realized Progression)', 'name_font': {'size': 13, 'bold': True}})
+            chart_j.set_x_axis({'name': 'Surveillance Timeline', 'date_axis': True})
+            chart_j.set_y_axis({'name': 'Capital Position Sizing ($)', 'major_gridlines': {'visible': True, 'line': {'color': '#EFEFEF', 'dash_type': 'dash'}}})
+            chart_j.set_size({'width': 960, 'height': 520})
+            ws_j.insert_chart('I2', chart_j)
 
-        # 11. AUM GROWTH
+        # --- RESTORED FEATURE: 11. AUM GROWTH MULTI-FUND COMPOSITE AREA PLOT ---
         if not aum_pivot.empty:
             ws_aum = workbook.add_worksheet('AUM Growth')
-            ws_aum.set_column('A:A', 15, date_format); ws_aum.set_column('B:Z', 20, money_round_fmt)
-            headers = ['Date'] + [c for c in aum_pivot.columns if c != 'Date']
+            ws_aum.set_column('A:A', 15, date_format)
+            ws_aum.set_column('B:ZZ', 20, money_round_fmt)
+
+            headers = list(aum_pivot.columns)
             for c, h in enumerate(headers): ws_aum.write(0, c, h, fmt_bd_header)
-            r = 1
+            r_a = 1
             for _, row in aum_pivot.iterrows():
-                ws_aum.write(r, 0, row['Date'], date_format)
-                for c_idx, col_name in enumerate(headers[1:], start=1): ws_aum.write(r, c_idx, row[col_name], money_round_fmt)
-                r += 1
+                ws_aum.write(r_a, 0, row['Date'], date_format)
+                for c_idx, col_name in enumerate(headers[1:], start=1): ws_aum.write(r_a, c_idx, row[col_name], money_round_fmt)
+                r_a += 1
+
+            chart_aum = workbook.add_chart({'type': 'area', 'subtype': 'stacked'})
+            colors = ['#4F81BD', '#F79646', '#9BBB59', '#8064A2', '#4BACC6', '#C0504D', '#F2DDDC']
+            for i, c in enumerate(headers[1:]):
+                chart_aum.add_series({
+                    'name': ['AUM Growth', 0, i + 1],
+                    'categories': ['AUM Growth', 1, 0, r_a - 1, 0],
+                    'values': ['AUM Growth', 1, i + 1, r_a - 1, i + 1],
+                    'fill': {'color': colors[i % len(colors)]}
+                })
+            chart_aum.set_title({'name': 'Total Assets Under Management (AUM Trend Vector)', 'name_font': {'size': 13, 'bold': True}})
+            chart_aum.set_x_axis({'name': 'Quarter Horizons', 'date_axis': True})
+            chart_aum.set_y_axis({'name': 'Ending Market Value NAV ($)', 'major_gridlines': {'visible': True, 'line': {'color': '#EFEFEF', 'dash_type': 'dash'}}})
+            chart_aum.set_size({'width': 960, 'height': 520})
+            ws_aum.insert_chart('J2', chart_aum)
 
         # 12. BRINSON ATTRIBUTION
         if not brinson_df.empty:
@@ -371,7 +422,7 @@ def export_to_excel(excel_io, master_df, active_days_df, irr_val_df, twr_aggrega
                 r += 1
             ws_decay.conditional_format(start_data_row-1, 2, r-1, 9, {'type': '3_color_scale', 'min_color': '#FFC7CE', 'mid_color': '#FFEB9C', 'max_color': '#C6EFCE'})
 
-        # --- 14. PROPERTY LEVEL COMPONENT DIAGNOSTICS TAB ---
+        # 14. PROPERTY LEVEL ANALYSIS
         if not prop_analysis_df.empty:
             ws_prop = workbook.add_worksheet('Property Analysis')
             headers = list(prop_analysis_df.columns)
@@ -385,11 +436,9 @@ def export_to_excel(excel_io, master_df, active_days_df, irr_val_df, twr_aggrega
                 ws_prop.write(r_p+1, 10, row['App Value Add'], f_val_green if row['App Value Add'] >= 0 else f_val_red)
             ws_prop.set_column('A:B', 25); ws_prop.set_column('C:E', 15); ws_prop.set_column('F:K', 18)
 
-        # 15. SUPPORT RECORDS & LOGS
         if not irr_val_df.empty: irr_val_df.to_excel(writer, sheet_name='IRR Validation', index=False)
         if not active_days_df.empty: active_days_df.to_excel(writer, sheet_name='Active Days', index=False)
-        if not error_log:
-            pd.DataFrame([{'Status': 'All modules executed successfully.'}]).to_excel(writer, sheet_name='Error Log', index=False)
+        if not error_log: pd.DataFrame([{'Status': 'All modules executed successfully.'}]).to_excel(writer, sheet_name='Error Log', index=False)
 
         if not disclosure_df.empty:
             ws_disc = workbook.add_worksheet('Disclosures')
@@ -398,9 +447,10 @@ def export_to_excel(excel_io, master_df, active_days_df, irr_val_df, twr_aggrega
                 ws_disc.write(r_d, 0, row['Topic'], fmt_bd_header if row['Description'] else fmt_bd_title)
                 if row['Description']: ws_disc.write(r_d, 1, row['Description'], get_format('#FFFFFF', '#000000', False, fmt_str, wrap=True, align='left'))
 
-        # Set Tab Colors
-        green_tabs = ['Performance Summary', 'Top Absolute Movers', 'Top Alpha Movers', 'Return Breakdown', 'Entity Breakdown', 'Quarterly Return Components', 'Risk & Correlation', 'Trailing IRR Chart', 'Property Analysis', 'Sector Attribution', 'IRR Decay Analysis']
+        green_tabs = ['Performance Summary', 'Top Absolute Movers', 'Top Alpha Movers', 'Return Breakdown', 'Entity Breakdown', 'Quarterly Return Components', 'Risk & Correlation', 'Trailing IRR Chart', 'Entity Trailing IRR', 'J Curve', 'AUM Growth', 'Property Analysis', 'Sector Attribution', 'IRR Decay Analysis']
         for name, sheet in writer.sheets.items():
             if name in green_tabs: sheet.set_tab_color('#00B050')
             elif name == 'Error Log': sheet.set_tab_color('#FF0000')
             elif name == 'Disclosures': sheet.set_tab_color('#808080')
+
+    print("spreadsheets compiled successfully inside system memory array.")
