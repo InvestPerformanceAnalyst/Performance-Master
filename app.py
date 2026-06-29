@@ -1,5 +1,5 @@
 # =====================================================================
-# WEB APPLICATION INTERFACE CORE PLATFORM
+# WEB APPLICATION INTERFACE CORE PLATFORM DEMO
 # =====================================================================
 import streamlit as st
 import pandas as pd
@@ -7,9 +7,9 @@ import io
 import sys
 import os
 
-# 1. OPTIMIZE BROWSER REAL ESTATE: Enforce full-bleed wide configuration at entry point
+# Optimize browser real estate: Enforce full-bleed wide layout configuration
 st.set_page_config(
-    page_title="Institutional Real Estate Portfolio Analytics Platform",
+    page_title="Institutional Real Estate Portfolio Analytics Platform Demo",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -30,58 +30,64 @@ class StreamlitConsoleRedirect:
     def flush(self):
         pass
 
-st.title("📊 Institutional Real Estate Portfolio Analytics Platform")
+# Updated app title targeting the requested showcase format
+st.title("📊 Institutional Real Estate Portfolio Analytics Platform Demo")
 st.write("---")
 
 tab_brief, tab_code, tab_engine = st.tabs(["📋 Platform Vision & Capabilities", "💻 Source Code Sneak-Peak", "⚙️ Run Analytical Calculation Core"])
 
 # ---------------------------------------------------------------------
-# TAB 1: STRATEGIC CAPABILITIES & VISION BRIEF
+# TAB 1: STRATEGIC CAPABILITIES & FIRST-PERSON VISION BRIEF
 # ---------------------------------------------------------------------
 with tab_brief:
-    st.markdown("## Bridging the Gap: From Back-Office Chaos to Front-Office Intelligence")
+    st.markdown("## Bridging the Gap: From Back-Office Fragmentation to Front-Office Intelligence")
+    
     st.write(
-        "This platform represents a enterprise performance tracking solution developed for **Affinius Capital**, "
-        "where it is deployed and widely utilized across various functional internal teams. The core objective of this "
-        "initiative was to architect a standardized, highly scalable reporting and analytics product designed to resolve "
-        "the severe data fragmentation and low operational standardization inherent across the real estate private equity (REPE) sector."
+        "I engineered this enterprise performance solution for **Affinius Capital**, where it is deployed and widely "
+        "utilized across various functional internal teams. My core objective during this initiative was to design and "
+        "architect a standardized, highly scalable reporting and analytics tech product capable of solving the structural "
+        "data fragmentation and lack of operational standardization inherent across the real estate private equity (REPE) landscape."
     )
     st.write(
-        "To effectively showcase these software engineering capabilities to an external audience, a curated subset of core "
-        "analytical functionalities has been extracted and adapted into this web-based application interface. All underlying "
-        "investment positions, transaction logs, and ledger lines have been completely sanitized using manufactured datasets "
-        "to guarantee absolute privacy and institutional compliance."
+        "To demonstrate my capabilities in bridging the gap between back-office raw outputs and front-office actionable intelligence, "
+        "I isolated a subset of my core calculation modules and turned them into this interactive web showcase. To preserve complete "
+        "institutional compliance and protect proprietary records, all underlying investment positions, asset allocations, and cash "
+        "flow history lines have been scrubbed using sanitized data that I manufactured for this presentation."
     )
     
-    st.markdown("### 🔍 Core Value-Add Capabilities Shipped Natively:")
+    st.markdown("### 🔍 Core Value-Add Architecture Modules I Shipped Natively:")
     
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("#### ⚖️ Holistic Performance Surveillance")
+        st.markdown("#### ⚖️ Holistic Performance Surveillance & Transparency")
         st.write(
-            "Evaluating performance on an isolated metric creates blind spots. This engine runs a dual-track financial core, "
-            "computing **both Time-Weighted Returns (TWR) and Internal Rates of Return (IRR)** concurrently for every individual asset, "
-            "parent fund, and sector composite. Linking these return profiles side-by-side provides a clean, accurate look at absolute "
-            "operational efficiency alongside time-weighted capital deployment metrics."
+            "Evaluating complex multi-tier vehicles on an isolated metric introduces systemic blind spots. I built a dual-track "
+            "financial math engine that computes **both Time-Weighted Returns (TWR) and Internal Rates of Return (IRR)** concurrently "
+            "for every single asset, fund vehicle, and customized portfolio sector composite. Displaying these metrics side-by-side "
+            "empowers portfolio managers to instantly verify operational asset-level efficiency alongside money-weighted dollar "
+            "surveillance across any targeted date horizon."
         )
-        st.markdown("#### 🎯 Institutional Relative Benchmarking")
+        st.markdown("#### 🎯 Active Institutional Alpha Benchmarking")
         st.write(
-            "True risk tracking demands context. The analytics engine takes flat transactional entries and maps them against "
-            "localized benchmarks—including NFI-ODCE and granular regional/sector NCREIF Property Index (NPI) slices. "
-            "By establishing exact temporal horizons, it isolates active management outperformance (Alpha) from basic market tailwinds."
+            "True portfolio risk surveillance requires rigorous baseline comparison. My analytics engine automatically maps unstandardized "
+            "transaction inputs directly against core institutional indices—including NFI-ODCE and granular bottom-up NCREIF "
+            "Property Index (NPI) sectors. By anchoring these matrices to exact chronological quarters, the platform enables "
+            "front-office stakeholders to cleanly separate active operational management value-add (Alpha) from passive market tailwinds."
         )
     with col2:
-        st.markdown("#### 📊 At-a-Glance Contribution Profiling")
+        st.markdown("#### 📊 Instant Contribution Profiling (Top Movers & Detractors)")
         st.write(
-            "End-users shouldn't have to guess what is driving performance. The platform integrates a GIPS-compliant "
-            "**Cariño Logarithmic Attribution core** that smoothly maps cross-period asset performance. This allows portfolio "
-            "managers to instantly filter, identify, and view the top absolute and alpha contributors and detractors driving fund returns."
+            "To remove ambiguity around performance drivers, I integrated a robust, GIPS-compliant **Cariño Logarithmic Attribution "
+            "core** that programmatically continuous-smooths multi-period asset returns. This allows the end-user to cut through the noise "
+            "and instantly identify the top absolute and relative contributors or detractors driving fund return adjustments. "
+            "What used to require hours of manual spreadsheet audit is condensed into a scannable, programmatic summary table."
         )
-        st.markdown("#### 📈 Trend Diagnostic & Historical Visualization")
+        st.markdown("#### 📈 Dynamic Trend Diagnostic & Historical Visualization")
         st.write(
-            "The platform includes dynamic, interactive chart engines that let users visually track historical "
-            "performance trajectories. By plotting rolling correlation matrices, J-curves, and asset duration drag lines, "
-            "the system changes retrospective numbers into a clear look at what is driving active portfolio trends."
+            "Data is only valuable if it drives a decision. I engineered automated, interactive visualization chart layers that "
+            "allow users to trace historical metrics over time. By visually packaging rolling correlation movements, J-curve cash-flow "
+            "progressions, and asset-level duration decay models, the interface turns complex backend financial ledgers into "
+            "intuitive, diagnostic trend tools for senior leadership."
         )
 
     st.markdown("---")
@@ -99,7 +105,6 @@ with tab_code:
     try:
         with open(src_module, "r") as f:
             code_content = f.read()
-        # Clean unrestricted output display
         st.code(code_content, language="python")
     except FileNotFoundError:
         st.info(f"Save '{src_module}' into your working directory folder tree to parse lines live here.")
@@ -148,16 +153,18 @@ with tab_engine:
             xls = pd.ExcelFile(io.BytesIO(active_bytes), engine='openpyxl')
             sheets = xls.sheet_names
             
+            # --- NEUTRALIZED RE-PHRASING: BACK-OFFICE LEDGER REVIEWS ---
             st.write("---")
-            st.markdown("### 🔎 The Accounting Chaos: Live Raw Data Inspector")
+            st.markdown("### 🔎 Back-Office Data Reality: Live Raw Inbound Inspector")
             st.markdown(
-                "Before triggering the engine calculations, use this browser to see how **unstructured and raw** the transaction ledgers are. "
-                "Notice the uneven column counts, shifting timeline fields, and zero-dollar rows typical of joint-venture database dumps:"
+                "Before running the underlying calculation loops, utilize this viewer to examine the non-standardized transactional "
+                "ledgers, variable column headers, and un-aggregated source structures typical of back-office operational data feeds:"
             )
             
             sheet_select = st.selectbox("Select a raw accounting ledger tab to inspect:", sheets)
             raw_df = pd.read_excel(xls, sheet_select)
             
+            # Calculate metrics to display aggregation capability
             total_rows_parsed = 0
             unique_assets = 0
             unique_composites = 0
@@ -175,7 +182,7 @@ with tab_engine:
             if unique_assets == 0 and 'Entity Name' in raw_df.columns:
                 unique_assets = raw_df['Entity Name'].nunique()
 
-            st.markdown("#### ⚡ Real-Time Processing System Profile")
+            st.markdown("#### ⚡ Real-Time Ingested System Profile")
             m_col1, m_col2, m_col3, m_col4 = st.columns(4)
             with m_col1:
                 st.metric(label="Ingested Database Tabs", value=f"{len(sheets)} Active Sheets")
@@ -189,11 +196,18 @@ with tab_engine:
             st.dataframe(raw_df.head(20), use_container_width=True)
             st.caption(f"📊 Showing top 20 records of tab '{sheet_select}' (Current Sheet Dimensions: {raw_df.shape[0]} rows × {raw_df.shape[1]} columns).")
                 
+            # --- HIGH-VISIBILITY INTERACTIVE RUN CALLOUT BLOCK ---
             st.write("---")
-            st.markdown("### ⚙️ Assemble Financial Workbook Models")
-            st.write("Clicking the execution trigger hooks standard print handles, passes the raw frames into your decoupled packages, and generates an institutional deliverable workbook inside system memory:")
+            st.markdown("### ⚙️ Execute Financial Engineering Engine & Compiler")
+            st.info(
+                "👉 **Action Required:** Click the button below to execute the backend reporting pipelines. "
+                "The system will inject the raw memory streams into your packages, trace execution progress inside "
+                "the live console below, and construct a multi-tab chart spreadsheet inside server RAM. \n\n"
+                "⚠️ *Performance Note:* Given the total data volume, multi-period Cariño smoothing loops, custom Newton-Raphson IRR "
+                "root solvers, and Excel chart-sheet generations, **this calculation loop can take up to 2 minutes to complete.**"
+            )
             
-            if st.button("Execute Portfolio Engine"):
+            if st.button("🚀 Click Here to Run Portfolio Core & Generate Output Report"):
                 st.markdown("#### 🖥️ Active Server Terminal Log Stream")
                 console_box = st.empty()
                 sys.stdout = StreamlitConsoleRedirect(console_box)
@@ -242,7 +256,7 @@ with tab_engine:
 
                     print("Log Trace 400: Running Module 4 spreadsheet workbook binary output array layout compilation...")
                     excel_buffer = io.BytesIO()
-                    export_to_excel(excel_buffer, master_df, active_days_df, irr_val_df, twr_aggregate_df, composite_twr_df, trailing_irr_df, trailing_pivot, ent_pivot, final_breakdowns, final_entity_breakdowns, final_return_distributions, excel_buffer, abs_df, alpha_df, corr_matrices, rolling_corr_df, error_log, get_disclosures(), portfolio_sections, brinson_df, aum_pivot, decay_df, prop_analysis_df)
+                    export_to_excel(excel_buffer, master_df, active_days_df, irr_val_df, twr_aggregate_df, composite_twr_df, trailing_irr_df, trailing_pivot, ent_pivot, final_breakdowns, final_entity_breakdowns, final_return_distributions, j_curve_export, abs_df, alpha_df, corr_matrices, rolling_corr_df, error_log, get_disclosures(), portfolio_sections, brinson_df, aum_pivot, decay_df, prop_analysis_df)
                     excel_buffer.seek(0)
                     
                     sys.stdout = sys.__stdout__
