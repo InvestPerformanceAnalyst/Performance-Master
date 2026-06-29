@@ -76,7 +76,8 @@ with tab_engine:
             st.success("📊 Custom workbook successfully bridged into server RAM.")
 
     if active_workbook is not None:
-        xls = pd.ExcelFile(active_workbook)
+        # EXPLICIT ENGINE DECLARATION TO PREVENT VALUE ERRORS ON MEMORY STREAMS
+        xls = pd.ExcelFile(active_workbook, engine='openpyxl')
         sheets = xls.sheet_names
         
         st.markdown("### 🔎 Live Raw Database Inspector")
@@ -123,6 +124,8 @@ with tab_engine:
 
                 print("Log Trace 300: Executing Module 3 Advanced Geometric Attribution and Optional NPI Grid Loops...")
                 error_log = []
+                
+                # FIXED TYPO HERE FROM indiv_twt TO CORRECT KEYWORD indiv_twr
                 trailing_irr_df, trailing_pivot, ent_pivot, final_breakdowns, final_entity_breakdowns, _, _, abs_df, alpha_df, _, _, _, _, _, prop_analysis_df = build_analytics(
                     cf_df, twr_df, bm_df, config_df, indiv_twr=indiv_twr, composite_twr_df=composite_twr_df, 
                     portfolio_sections=portfolio_sections, error_log=error_log, REPORTING_DATE=REPORTING_DATE,
