@@ -54,7 +54,7 @@ with tab_engine:
     st.markdown("## Interactive Calculation Sandbox")
     st.write("Test the calculation engine below. View raw input columns live on screen, monitor real-time standard output console statuses, and extract compiled performance deliverables.")
     
-    # Updated path targeting standard repository directories
+    # Target directory path for pre-loaded repository files
     DEMO_FILE_PATH = "data/Performance_Master_Sample_Inputs.xlsx"
     
     st.sidebar.markdown("### 📥 Source File Settings")
@@ -63,32 +63,38 @@ with tab_engine:
         ["Use Pre-loaded Demo File", "Upload Custom Master Workbook"]
     )
     
-    active_workbook = None
+    active_bytes = None
+    
     if "Pre-loaded" in data_source:
         if os.path.exists(DEMO_FILE_PATH):
-            # Check for Git LFS pointer text leakage before passing into Pandas
-            with open(DEMO_FILE_PATH, "r", errors="ignore") as test_f:
-                lead_bytes = test_f.read(100)
-            
-            if "version https://git-lfs" in lead_bytes:
-                st.error("❌ **Git LFS Mirror Pointer Error Detected!** \n\n"
-                         "The pre-loaded demo spreadsheet file inside your GitHub repository is currently stored as a text shortcut link "
-                         "instead of a binary Excel file. To fix this, deactivate Git LFS for this file or upload the binary file directly using "
-                         "the **'Upload Custom Master Workbook'** toggle to run the sandbox calculations.")
-            else:
-                active_workbook = DEMO_FILE_PATH
-                st.success("✅ Connected to repository demo file (`Performance_Master_Sample_Inputs.xlsx`).")
+            try:
+                with open(DEMO_FILE_PATH, "rb") as f:
+                    file_data = f.read()
+                
+                # Intercept Git LFS text shortcuts before passing to zip compressors
+                if b"version https://git-lfs" in file_data[:100]:
+                    st.error("❌ **Git LFS Mirror Pointer Error Detected!** \n\n"
+                             "The pre-loaded demo spreadsheet file inside your GitHub repository is currently stored as a text shortcut link "
+                             "instead of a binary Excel file. To fix this, deactivate Git LFS for this file or upload the binary file directly using "
+                             "the **'Upload Custom Master Workbook'** toggle to run the sandbox calculations.")
+                else:
+                    active_bytes = file_data
+                    st.success("✅ Connected to repository demo file (`Performance_Master_Sample_Inputs.xlsx`).")
+            except Exception as e:
+                st.error(f"Error accessing repository file path: {str(e)}")
         else:
             st.warning(f"⚠️ Sample file not detected at directory location `{DEMO_FILE_PATH}`. Please upload your own workbook below.")
     else:
         uploaded_file = st.file_uploader("Upload Master Performance Workbook (.xlsx)", type=["xlsx"])
         if uploaded_file is not None:
-            active_workbook = uploaded_file
+            # FIX: Pull raw bytes directly to decouple tracking from stream cursor states
+            active_bytes = uploaded_file.getvalue()
             st.success("📊 Custom workbook successfully bridged into server RAM.")
 
-    if active_workbook is not None:
+    if active_bytes is not None:
         try:
-            xls = pd.ExcelFile(active_workbook, engine='openpyxl')
+            # Initialize Excel interface directly out of stateless binary arrays
+            xls = pd.ExcelFile(io.BytesIO(active_bytes), engine='openpyxl')
             sheets = xls.sheet_names
             
             st.markdown("### 🔎 Live Raw Database Inspector")
@@ -135,6 +141,7 @@ with tab_engine:
 
                     print("Log Trace 300: Executing Module 3 Advanced Geometric Attribution and Optional NPI Grid Loops...")
                     error_log = []
+                    
                     trailing_irr_df, trailing_pivot, ent_pivot, final_breakdowns, final_entity_breakdowns, final_return_distributions, j_curve_export, abs_df, alpha_df, corr_matrices, rolling_corr_df, brinson_df, aum_pivot, decay_df, prop_analysis_df = build_analytics(
                         cf_df, twr_df, bm_df, config_df, indiv_twr=indiv_twr, composite_twr_df=composite_twr_df, 
                         portfolio_sections=portfolio_sections, error_log=error_log, REPORTING_DATE=REPORTING_DATE,
