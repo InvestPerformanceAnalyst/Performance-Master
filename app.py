@@ -54,6 +54,7 @@ with tab_engine:
     st.markdown("## Interactive Calculation Sandbox")
     st.write("Test the calculation engine below. View raw input columns live on screen, monitor real-time standard output console statuses, and extract compiled performance deliverables.")
     
+    # Updated path targeting standard repository directories
     DEMO_FILE_PATH = "data/Performance_Master_Sample_Inputs.xlsx"
     
     st.sidebar.markdown("### 📥 Source File Settings")
@@ -65,8 +66,18 @@ with tab_engine:
     active_workbook = None
     if "Pre-loaded" in data_source:
         if os.path.exists(DEMO_FILE_PATH):
-            active_workbook = DEMO_FILE_PATH
-            st.success("✅ Connected to repository demo file (`Performance_Master_Sample_Inputs.xlsx`).")
+            # Check for Git LFS pointer text leakage before passing into Pandas
+            with open(DEMO_FILE_PATH, "r", errors="ignore") as test_f:
+                lead_bytes = test_f.read(100)
+            
+            if "version https://git-lfs" in lead_bytes:
+                st.error("❌ **Git LFS Mirror Pointer Error Detected!** \n\n"
+                         "The pre-loaded demo spreadsheet file inside your GitHub repository is currently stored as a text shortcut link "
+                         "instead of a binary Excel file. To fix this, deactivate Git LFS for this file or upload the binary file directly using "
+                         "the **'Upload Custom Master Workbook'** toggle to run the sandbox calculations.")
+            else:
+                active_workbook = DEMO_FILE_PATH
+                st.success("✅ Connected to repository demo file (`Performance_Master_Sample_Inputs.xlsx`).")
         else:
             st.warning(f"⚠️ Sample file not detected at directory location `{DEMO_FILE_PATH}`. Please upload your own workbook below.")
     else:
@@ -76,83 +87,83 @@ with tab_engine:
             st.success("📊 Custom workbook successfully bridged into server RAM.")
 
     if active_workbook is not None:
-        # EXPLICIT ENGINE DECLARATION TO PREVENT VALUE ERRORS ON MEMORY STREAMS
-        xls = pd.ExcelFile(active_workbook, engine='openpyxl')
-        sheets = xls.sheet_names
-        
-        st.markdown("### 🔎 Live Raw Database Inspector")
-        st.write("Toggle through the tabs below to view the un-scrubbed records, raw transactional rows, and complex layouts before processing:")
-        sheet_select = st.selectbox("Choose a raw workbook sheet to parse:", sheets)
-        st.dataframe(pd.read_excel(xls, sheet_select).head(12), use_container_width=True)
-        st.caption(f"Displaying top 12 rows of tab '{sheet_select}' (Dimensions: {pd.read_excel(xls, sheet_select).shape[0]} rows).")
+        try:
+            xls = pd.ExcelFile(active_workbook, engine='openpyxl')
+            sheets = xls.sheet_names
             
-        st.write("---")
-        st.markdown("### ⚙️ Assemble Financial Workbook Models")
-        
-        if st.button("Execute Portfolio Engine"):
-            st.markdown("#### 🖥️ Active Server Terminal Log Stream")
-            console_box = st.empty()
-            sys.stdout = StreamlitConsoleRedirect(console_box)
+            st.markdown("### 🔎 Live Raw Database Inspector")
+            st.write("Toggle through the tabs below to view the un-scrubbed records, raw transactional rows, and complex layouts before processing:")
+            sheet_select = st.selectbox("Choose a raw workbook sheet to parse:", sheets)
+            st.dataframe(pd.read_excel(xls, sheet_select).head(12), use_container_width=True)
+            st.caption(f"Displaying top 12 rows of tab '{sheet_select}' (Dimensions: {pd.read_excel(xls, sheet_select).shape[0]} rows).")
+                
+            st.write("---")
+            st.markdown("### ⚙️ Assemble Financial Workbook Models")
             
-            try:
-                print("Log Trace 100: Initializing spreadsheet workbook array memory maps...")
-                cf_df = pd.read_excel(xls, 'Cashflow')
-                twr_df = pd.read_excel(xls, 'TWR')
-                config_df = pd.read_excel(xls, 'Configuration') if 'Configuration' in sheets else pd.DataFrame()
-                bm_df = pd.read_excel(xls, 'Benchmark') if 'Benchmark' in sheets else pd.DataFrame()
+            if st.button("Execute Portfolio Engine"):
+                st.markdown("#### 🖥️ Active Server Terminal Log Stream")
+                console_box = st.empty()
+                sys.stdout = StreamlitConsoleRedirect(console_box)
                 
-                attr_df = pd.read_excel(xls, 'Attributes') if 'Attributes' in sheets else pd.DataFrame()
-                npi_df = pd.read_excel(xls, 'Expanded NPI Detail') if 'Expanded NPI Detail' in sheets else pd.DataFrame()
-                prop_comp_df = pd.read_excel(xls, 'Property Components') if 'Property Components' in sheets else pd.DataFrame()
+                try:
+                    print("Log Trace 100: Initializing spreadsheet workbook array memory maps...")
+                    cf_df = pd.read_excel(xls, 'Cashflow')
+                    twr_df = pd.read_excel(xls, 'TWR')
+                    config_df = pd.read_excel(xls, 'Configuration') if 'Configuration' in sheets else pd.DataFrame()
+                    bm_df = pd.read_excel(xls, 'Benchmark') if 'Benchmark' in sheets else pd.DataFrame()
+                    
+                    attr_df = pd.read_excel(xls, 'Attributes') if 'Attributes' in sheets else pd.DataFrame()
+                    npi_df = pd.read_excel(xls, 'Expanded NPI Detail') if 'Expanded NPI Detail' in sheets else pd.DataFrame()
+                    prop_comp_df = pd.read_excel(xls, 'Property Components') if 'Property Components' in sheets else pd.DataFrame()
 
-                if 'Configuration' not in sheets:
-                    print("Log Trace 101: Configuration data absent. Building default flat portfolio roster...")
-                    unique_ents = cf_df['Entity Name'].unique()
-                    config_df = pd.DataFrame({'Entity': unique_ents, 'Investor Name': ["Unknown Investor"] * len(unique_ents)})
+                    if 'Configuration' not in sheets:
+                        print("Log Trace 101: Configuration data absent. Building default flat portfolio roster...")
+                        unique_ents = cf_df['Entity Name'].unique()
+                        config_df = pd.DataFrame({'Entity': unique_ents, 'Investor Name': ["Unknown Investor"] * len(unique_ents)})
 
-                print("Log Trace 102: Data extraction successful. Formatting temporal alignment indexes...")
-                cf_df['Effective Date'] = pd.to_datetime(cf_df['Effective Date'])
-                twr_df['Date'] = pd.to_datetime(twr_df['Date'])
-                REPORTING_DATE = twr_df['Date'].max()
-                print(f" -> Portfolio measurement lock boundary confirmed at: {REPORTING_DATE.strftime('%Y-%m-%d')}")
+                    print("Log Trace 102: Data extraction successful. Formatting temporal alignment indexes...")
+                    cf_df['Effective Date'] = pd.to_datetime(cf_df['Effective Date'])
+                    twr_df['Date'] = pd.to_datetime(twr_df['Date'])
+                    REPORTING_DATE = twr_df['Date'].max()
+                    print(f" -> Portfolio measurement lock boundary confirmed at: {REPORTING_DATE.strftime('%Y-%m-%d')}")
 
-                print("Log Trace 200: Processing Module 2 Money-Weighted XIRR matrices & TWR fund link summaries...")
-                master_df, active_days_df, twr_agg, composite_twr_df, indiv_twr, portfolio_sections = build_performance_summary(
-                    cf_df, twr_df, bm_df, config_df, "Blended Institutional Master Composite", [], REPORTING_DATE
-                )
-                print(f" -> Computed {master_df.shape[0]} unique portfolio composite clusters.")
+                    print("Log Trace 200: Processing Module 2 Money-Weighted XIRR matrices & TWR fund link summaries...")
+                    master_df, active_days_df, irr_val_df, twr_aggregate_df, composite_twr_df, indiv_twr, portfolio_sections = build_performance_summary(
+                        cf_df, twr_df, bm_df, config_df, "Blended Institutional Master Composite", [], REPORTING_DATE
+                    )
+                    print(f" -> Computed {master_df.shape[0]} unique portfolio composite clusters.")
 
-                print("Log Trace 300: Executing Module 3 Advanced Geometric Attribution and Optional NPI Grid Loops...")
-                error_log = []
-                
-                # FIXED TYPO HERE FROM indiv_twt TO CORRECT KEYWORD indiv_twr
-                trailing_irr_df, trailing_pivot, ent_pivot, final_breakdowns, final_entity_breakdowns, _, _, abs_df, alpha_df, _, _, _, _, _, prop_analysis_df = build_analytics(
-                    cf_df, twr_df, bm_df, config_df, indiv_twr=indiv_twr, composite_twr_df=composite_twr_df, 
-                    portfolio_sections=portfolio_sections, error_log=error_log, REPORTING_DATE=REPORTING_DATE,
-                    attr_df=attr_df, npi_df=npi_df, prop_comp_df=prop_comp_df
-                )
-                
-                if not prop_analysis_df.empty:
-                    print(f" -> Success: Bottom-up property metrics evaluated. Mapped {prop_analysis_df.shape[0]} rows against local NPI targets.")
-                else:
-                    print(" -> Notice: Optional bottom-up property maps absent. Compiling base summary sheets.")
+                    print("Log Trace 300: Executing Module 3 Advanced Geometric Attribution and Optional NPI Grid Loops...")
+                    error_log = []
+                    trailing_irr_df, trailing_pivot, ent_pivot, final_breakdowns, final_entity_breakdowns, final_return_distributions, j_curve_export, abs_df, alpha_df, corr_matrices, rolling_corr_df, brinson_df, aum_pivot, decay_df, prop_analysis_df = build_analytics(
+                        cf_df, twr_df, bm_df, config_df, indiv_twr=indiv_twr, composite_twr_df=composite_twr_df, 
+                        portfolio_sections=portfolio_sections, error_log=error_log, REPORTING_DATE=REPORTING_DATE,
+                        attr_df=attr_df, npi_df=npi_df, prop_comp_df=prop_comp_df
+                    )
+                    
+                    if not prop_analysis_df.empty:
+                        print(f" -> Success: Bottom-up property metrics evaluated. Mapped {prop_analysis_df.shape[0]} rows against local NPI targets.")
+                    else:
+                        print(" -> Notice: Optional bottom-up property maps absent. Compiling base summary sheets.")
 
-                print("Log Trace 400: Running Module 4 spreadsheet workbook binary output array layout compilation...")
-                excel_buffer = io.BytesIO()
-                export_to_excel(excel_buffer, master_df, active_days_df, trailing_irr_df, trailing_pivot, ent_pivot, final_breakdowns, final_entity_breakdowns, abs_df, alpha_df, prop_analysis_df)
-                excel_buffer.seek(0)
-                
-                sys.stdout = sys.__stdout__
-                st.success("Analysis Complete! Deliverable workbook compiled natively inside system RAM.")
-                
-                st.download_button(
-                    label="📥 Download Compiled Portfolio Report (.xlsx)",
-                    data=excel_buffer,
-                    file_name=f"Processed_Performance_Summary_{REPORTING_DATE.strftime('%Y%m%d')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-            except Exception as e:
-                sys.stdout = sys.__stdout__
-                st.error(f"Environmental Compilation Failure: {str(e)}")
-                import traceback
-                st.code(traceback.format_exc())
+                    print("Log Trace 400: Running Module 4 spreadsheet workbook binary output array layout compilation...")
+                    excel_buffer = io.BytesIO()
+                    export_to_excel(excel_buffer, master_df, active_days_df, irr_val_df, twr_aggregate_df, composite_twr_df, trailing_irr_df, trailing_pivot, ent_pivot, final_breakdowns, final_entity_breakdowns, final_return_distributions, j_curve_export, abs_df, alpha_df, corr_matrices, rolling_corr_df, error_log, get_disclosures(), portfolio_sections, brinson_df, aum_pivot, decay_df, prop_analysis_df)
+                    excel_buffer.seek(0)
+                    
+                    sys.stdout = sys.__stdout__
+                    st.success("Analysis Complete! Deliverable workbook compiled natively inside system RAM.")
+                    
+                    st.download_button(
+                        label="📥 Download Compiled Portfolio Report (.xlsx)",
+                        data=excel_buffer,
+                        file_name=f"Processed_Performance_Summary_{REPORTING_DATE.strftime('%Y%m%d')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                except Exception as e:
+                    sys.stdout = sys.__stdout__
+                    st.error(f"Environmental Compilation Failure: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
+        except Exception as e:
+            st.error(f"File Reader Error: Your workbook could not be decoded. {str(e)}")
