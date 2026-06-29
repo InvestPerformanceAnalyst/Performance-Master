@@ -25,21 +25,58 @@ class StreamlitConsoleRedirect:
 st.title("📊 Institutional Real Estate Portfolio Analytics Platform")
 st.write("---")
 
-tab_brief, tab_code, tab_engine = st.tabs(["📋 Platform Overview", "💻 Source Code Sneak-Peak", "⚙️ Run Analytical Calculation Core"])
+tab_brief, tab_code, tab_engine = st.tabs(["📋 Platform Vision & Capabilities", "💻 Source Code Sneak-Peak", "⚙️ Run Analytical Calculation Core"])
 
+# ---------------------------------------------------------------------
+# TAB 1: STRATEGIC CAPABILITIES BRIEF
+# ---------------------------------------------------------------------
 with tab_brief:
-    st.markdown("## Platform Brief & Functional Value Proposition")
-    st.write("This engine decouples performance tracking calculations from manual excel files into a structured, production-ready processing pipeline.")
-    st.markdown("""
-    ### Technical Architectural Breakthroughs:
-    * **Stateless Memory Virtualization:** Processes large datasets safely inside server volatile RAM via `io.BytesIO` streams, avoiding any permanent file-writing overhead.
-    * **Hardened Custom XIRR Solvers:** Employs an economically anchored guess algorithm to successfully navigate complex real estate J-curves without anchoring to mathematical phantom roots.
-    * **Resilient Column-Remapping Layer:** Features programmatic column standardizations to gracefully process accounting files regardless of shifting JV partner fee definitions.
-    * **Granular NPI Alpha Benchmarking:** Ingests asset records, pairs them with localized NCREIF Property Index indices, and isolates pure asset-level operational Alpha.
-    """)
-    st.markdown("### Underlying Data Definition Structure")
+    st.markdown("## Bridging the Gap: From Back-Office Chaos to Front-Office Intelligence")
+    st.write(
+        "In institutional real equity private equity, asset surveillance is frequently bottlenecked by unstructured "
+        "transaction ledgers, joint-venture partner accounting variations, and fractured history tracking. This platform "
+        "is a custom-engineered financial solution designed to scale performance analytics and deliver **clear, actionable intelligence** "
+        "directly into the hands of portfolio managers and senior decision-makers."
+    )
+    
+    st.markdown("### 🔍 Core Value-Add Capabilities Shipped Natively:")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("#### ⚖️ Holistic Performance Surveillance")
+        st.write(
+            "Evaluating performance on a single metric creates a blind spot. This engine runs a dual-track financial core, "
+            "computing **both Time-Weighted Returns (TWR) and Internal Rates of Return (IRR)** concurrently for every individual asset, "
+            "parent fund, and sector composite. Linking these return profiles side-by-side provides a clean, accurate look at absolute "
+            "operational efficiency alongside time-weighted capital deployment metrics."
+        )
+        st.markdown("#### 🎯 Institutional Relative Benchmarking")
+        st.write(
+            "True risk tracking demands context. The analytics engine takes flat transactional entries and maps them against "
+            "localized benchmarks—including NFI-ODCE and granular regional/sector NCREIF Property Index (NPI) slices. "
+            "By establishing exact temporal horizons, it isolates active management outperformance (Alpha) from basic market tailwinds."
+        )
+    with col2:
+        st.markdown("#### 📊 At-a-Glance Contribution Profiling")
+        st.write(
+            "End-users shouldn't have to guess what is driving performance. The platform integrates a GIPS-compliant "
+            "**Cariño Logarithmic Attribution core** that smoothly maps cross-period asset performance. This allows portfolio "
+            "managers to instantly filter, identify, and view the top absolute and alpha contributors and detractors driving fund returns."
+        )
+        st.markdown("#### 📈 Trend Diagnostic & Historical Visualization")
+        st.write(
+            "The platform includes dynamic, interactive chart engines that let users visually track historical "
+            "performance trajectories. By plotting rolling correlation matrices, J-curves, and asset duration drag lines, "
+            "the system changes retrospective numbers into a clear look at what is driving active portfolio trends."
+        )
+
+    st.markdown("---")
+    st.markdown("#### Technical Implementation Blueprint Execution")
     st.dataframe(get_disclosures(), use_container_width=True, hide_index=True)
 
+# ---------------------------------------------------------------------
+# TAB 2: SOURCE CODE ACCESSIBILITY SYNTAX SHOWCASE
+# ---------------------------------------------------------------------
 with tab_code:
     st.markdown("## Production Source Syntax Pipeline Preview")
     st.write("Examine the clean engineering implementation design paradigms of the decoupled backend modules:")
@@ -50,6 +87,9 @@ with tab_code:
     except FileNotFoundError:
         st.info(f"Save '{src_module}' into your working directory folder tree to parse lines live here.")
 
+# ---------------------------------------------------------------------
+# TAB 3: STREAM PROCESSING ENGINE LAYER (THE INTERACTIVE TOOL)
+# ---------------------------------------------------------------------
 with tab_engine:
     st.markdown("## Interactive Calculation Sandbox")
     st.write("Test the calculation engine below. View raw input columns live on screen, monitor real-time standard output console statuses, and extract compiled performance deliverables.")
@@ -68,8 +108,16 @@ with tab_engine:
         if os.path.exists(DEMO_FILE_PATH):
             try:
                 with open(DEMO_FILE_PATH, "rb") as f:
-                    active_bytes = f.read()
-                st.success("✅ Connected to repository demo file reference folder.")
+                    file_data = f.read()
+                
+                if b"version https://git-lfs" in file_data[:100]:
+                    st.error("❌ **Git LFS Mirror Pointer Error Detected!** \n\n"
+                             "The pre-loaded demo spreadsheet file inside your GitHub repository is currently stored as a text shortcut link "
+                             "instead of a binary Excel file. To fix this, deactivate Git LFS for this file or upload the binary file directly using "
+                             "the **'Upload Custom Master Workbook'** toggle to run the sandbox calculations.")
+                else:
+                    active_bytes = file_data
+                    st.success("✅ Connected to repository demo file (`Performance_Master_Sample_Inputs.xlsx`).")
             except Exception as e:
                 st.error(f"Error accessing repository file path: {str(e)}")
         else:
@@ -81,7 +129,6 @@ with tab_engine:
             st.success("📊 Custom workbook successfully bridged into server RAM.")
 
     if active_bytes is not None:
-        # --- DEFENSIVE INGESTION WITH RESTORED PREVIEWER BACK-STOP ---
         try:
             xls = pd.ExcelFile(io.BytesIO(active_bytes), engine='openpyxl')
             sheets = xls.sheet_names
@@ -97,9 +144,10 @@ with tab_engine:
             raw_df = pd.read_excel(xls, sheet_select)
             st.dataframe(raw_df.head(20), use_container_width=True)
             st.caption(f"📊 Showing first 20 records of raw data tab '{sheet_select}' (Total Dimensions: {raw_df.shape[0]} rows × {raw_df.shape[1]} columns).")
-            
+                
             st.write("---")
             st.markdown("### ⚙️ Assemble Financial Workbook Models")
+            st.write("Clicking the execution trigger hooks standard print handles, passes the raw frames into your decoupled packages, and generates an institutional deliverable workbook inside system memory:")
             
             if st.button("Execute Portfolio Engine"):
                 st.markdown("#### 🖥️ Active Server Terminal Log Stream")
@@ -167,16 +215,5 @@ with tab_engine:
                     st.error(f"Environmental Compilation Failure: {str(e)}")
                     import traceback
                     st.code(traceback.format_exc())
-                    
         except Exception as e:
-            # INTERCEPT CORRUPTED FILES AND EXPOSE CONTENTS LIVE FOR REVIEW
-            text_peek = active_bytes[:500].decode('utf-8', errors='ignore')
-            st.error(f"❌ **File Ingestion Error: Not a Genuine Excel Workbook!**")
-            st.markdown(
-                f"The underlying file structure could not be mapped to zip compression tables. "
-                f"Here are the first 500 characters of the raw data that was actually read from disk:\n"
-                f"```text\n{text_peek}\n```\n"
-                f"**Diagnostic Verdict:** If the text lookahead contains `<!DOCTYPE html>` or `github.com`, you have saved a webpage markup "
-                f"by mistake. If it lists a `sha256` hash or an `oid`, Git LFS has locked the asset as an un-fetched pointer on GitHub. "
-                f"Overwrite this file inside your repository with your valid local binary spreadsheet to clear the system cache."
-            )
+            st.error(f"File Reader Error: Your workbook could not be decoded. {str(e)}")
