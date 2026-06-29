@@ -41,13 +41,15 @@ def build_analytics(cf_df, twr_df, bm_df, config_df, indiv_twr, composite_twr_df
     final_breakdowns, final_entity_breakdowns = [], []
     bm_twr = bm_df.rename(columns={'Period': 'Date'})
 
+    income_col = 'Gross Investment Income Minus JV Fees' if 'Gross Investment Income Minus JV Fees' in composite_twr_df.columns else 'Gross Investment Income Minus Fees'
+
     for title, assets in portfolio_sections:
         c_name = f'TOTAL {title} COMPOSITE'
         c_data = composite_twr_df[composite_twr_df['Entity Name'] == c_name].copy()
         if c_data.empty: continue
         j = c_data.merge(bm_twr[['Date', 'NetTotalReturn', 'GrossTotalReturn']], on='Date', how='left').fillna(0)
         
-        j['Total Fees'] = j['Gross Investment Income Minus JV Fees'] - j['Net Investment Income']
+        j['Total Fees'] = j[income_col] - j['Net Investment Income']
         j['Port Growth'] = (1 + j['Net Total Return']).cumprod() * 1000
         j['BM Growth'] = (1 + j['NetTotalReturn']).cumprod() * 1000
 
@@ -65,7 +67,7 @@ def build_analytics(cf_df, twr_df, bm_df, config_df, indiv_twr, composite_twr_df
             e_join = e_join.rename(columns={'Port Growth': 'Growth of $1,000', 'BM Growth': 'Benchmark Growth of $1,000'})
             final_entity_breakdowns.append({'Composite Name': c_name, 'Benchmark Name': 'NFI-ODCE', 'Data': e_join, 'Entities': valid_ents})
 
-    # --- FORCED Universe Population Trajectory ---
+    # --- TOP MOVERS (FORCED FULL PORTFOLIO POPULATION LOGIC) ---
     abs_movers_list, alpha_movers_list = [], []
     all_configured_entities = list(dict.fromkeys([e for _, l in portfolio_sections for e in l]))
     
@@ -75,7 +77,7 @@ def build_analytics(cf_df, twr_df, bm_df, config_df, indiv_twr, composite_twr_df
         abs_movers_list.append({'Period': 'Since Inception', 'Entity Name': ent, 'Net Income Contribution': 0.0, 'Net Appreciation Contribution': tot_c, 'Net Total Contribution': tot_c})
         alpha_movers_list.append({'Period': 'Since Inception', 'Entity Name': ent, 'Entity Contribution to Return': tot_c, 'Benchmark Equivalent Contribution': 0.0, 'Contribution to Alpha': tot_c})
 
-    # --- PROPERTY LEVEL OPTIONAL REGIONAL ANALYSIS TAB ---
+    # --- PROPERTY LEVEL ANALYTICS MATRIX (OPTIONAL HARNESSED) ---
     prop_analysis_df = pd.DataFrame()
     if not prop_comp_df.empty and not npi_df.empty and not attr_df.empty:
         try:
