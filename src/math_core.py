@@ -14,6 +14,7 @@ def xirr_custom(dates, cashflows, guess=0.1):
         if r <= -1.0: return float('inf')
         return sum(cf / (1 + r)**y for cf, y in zip(cashflows, years))
 
+    # --- MOIC-Anchored CAGR Initialization Target Heuristic ---
     pos_cf = sum(cf for cf in cashflows if cf > 0)
     neg_cf = sum(-cf for cf in cashflows if cf < 0)
     if neg_cf == 0: return np.nan
@@ -40,6 +41,7 @@ def xirr_custom(dates, cashflows, guess=0.1):
     if not valid_roots: return np.nan
     best_root = min(valid_roots, key=lambda r: abs(r - smart_guess))
     
+    # GIPS Compliance Intercept Boundary Constraint
     total_days = (dates[-1] - dates[0]).days
     if 0 < total_days < 365:
         return (1 + best_root) ** (total_days / 365.0) - 1
@@ -60,8 +62,13 @@ def get_period_twr(df, ret_col, end_date, date_col='Date', ytd=False, years=None
     if df.empty: return np.nan
     if ytd:
         start_date = pd.to_datetime(f"{end_date.year - 1}-12-31")
-    elif years:
-        start_date = end_date - pd.DateOffset(years=years)
+    elif years is not None:
+        # INTERCEPT FOR FRACTIONAL QUARTERLY HORIZONS (0.25 YEARS)
+        # Prevents dateutil/pandas ValueErrors on public cloud deployment containers
+        if years == 0.25:
+            start_date = end_date - pd.DateOffset(months=3)
+        else:
+            start_date = end_date - pd.DateOffset(years=int(years))
     else:
         return np.nan
         
