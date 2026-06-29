@@ -14,7 +14,6 @@ def xirr_custom(dates, cashflows, guess=0.1):
         if r <= -1.0: return float('inf')
         return sum(cf / (1 + r)**y for cf, y in zip(cashflows, years))
 
-    # --- MOIC-Anchored CAGR Initialization Target Heuristic ---
     pos_cf = sum(cf for cf in cashflows if cf > 0)
     neg_cf = sum(-cf for cf in cashflows if cf < 0)
     if neg_cf == 0: return np.nan
@@ -41,7 +40,6 @@ def xirr_custom(dates, cashflows, guess=0.1):
     if not valid_roots: return np.nan
     best_root = min(valid_roots, key=lambda r: abs(r - smart_guess))
     
-    # GIPS Compliance Intercept Boundary Constraint
     total_days = (dates[-1] - dates[0]).days
     if 0 < total_days < 365:
         return (1 + best_root) ** (total_days / 365.0) - 1
@@ -58,7 +56,7 @@ def annualize_return_exact_days(cum_ret, days_active):
     return (1 + cum_ret)**(365.0 / days_active) - 1
 
 def get_period_twr(df, ret_col, end_date, date_col='Date', ytd=False, years=None):
-    """Slices a target performance dataframe time-window and return geometric sub-links."""
+    """Slices a target performance dataframe time-window and returns geometric sub-links."""
     if df.empty: return np.nan
     if ytd:
         start_date = pd.to_datetime(f"{end_date.year - 1}-12-31")
@@ -79,13 +77,16 @@ def get_period_twr(df, ret_col, end_date, date_col='Date', ytd=False, years=None
     return cum_ret
 
 def calc_6_components(df):
-    """Deconstructs net accounting variables down to 6 distinct sub-period components."""
+    """Deconstructs net accounting variables down to 6 components with resilient column checks."""
     if df.empty: return df
     df['Denominator'] = df['Denominator'].replace(0, np.nan)
     
-    # Explicit Mapping to Revised Data Formats
-    df['Gross Income Return'] = df['Gross Investment Income Minus JV Fees'] / df['Denominator']
-    df['Gross Appreciation Return'] = df['Gross Appreciation'] / df['Denominator']
+    # Schema-Resilient Column Intercept Layer
+    income_col = 'Gross Investment Income Minus JV Fees' if 'Gross Investment Income Minus JV Fees' in df.columns else 'Gross Investment Income Minus Fees'
+    app_col = 'Gross Appreciation' if 'Gross Appreciation' in df.columns else 'Total Gross Appreciation'
+    
+    df['Gross Income Return'] = df[income_col] / df['Denominator']
+    df['Gross Appreciation Return'] = df[app_col] / df['Denominator']
     df['Gross Total Return'] = df['Gross Income Return'].fillna(0) + df['Gross Appreciation Return'].fillna(0)
     df['Net Income Return'] = df['Net Investment Income'] / df['Denominator']
     df['Net Appreciation Return'] = df['Net Appreciation'] / df['Denominator']
