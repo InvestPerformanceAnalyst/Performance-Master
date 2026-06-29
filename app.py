@@ -30,7 +30,6 @@ class StreamlitConsoleRedirect:
     def flush(self):
         pass
 
-# Updated app title targeting the requested showcase format
 st.title("📊 Institutional Real Estate Portfolio Analytics Platform Demo")
 st.write("---")
 
@@ -79,8 +78,8 @@ with tab_brief:
         st.write(
             "To remove ambiguity around performance drivers, I integrated a robust, GIPS-compliant **Cariño Logarithmic Attribution "
             "core** that programmatically continuous-smooths multi-period asset returns. This allows the end-user to cut through the noise "
-            "and instantly identify the top absolute and relative contributors or detractors driving fund return adjustments. "
-            "What used to require hours of manual spreadsheet audit is condensed into a scannable, programmatic summary table."
+            "and instantly identify the top absolute and relative contributors or detractors driving fund returns. "
+            "What used to require hours of manual calculation of performance summary from my team of performance analysts was automated and standardized."
         )
         st.markdown("#### 📈 Dynamic Trend Diagnostic & Historical Visualization")
         st.write(
@@ -88,6 +87,54 @@ with tab_brief:
             "allow users to trace historical metrics over time. By visually packaging rolling correlation movements, J-curve cash-flow "
             "progressions, and asset-level duration decay models, the interface turns complex backend financial ledgers into "
             "intuitive, diagnostic trend tools for senior leadership."
+        )
+
+    # --- NEW SECTION: CROSS-DEPARTMENTAL ENTERPRISE USE CASES ---
+    st.write("---")
+    st.markdown("### 🏢 Cross-Functional Enterprise Use Cases")
+    st.write(
+        "To illustrate how this technology product impacts day-to-day institutional operations, "
+        "consider how different teams leverage this exact engine to drive workflow efficiency:"
+    )
+    
+    uc1, uc2 = st.columns(2)
+    with uc1:
+        st.markdown("##### 🏗️ 1. Portfolio Management (Industrial Sector Track Record)")
+        st.write(
+            "An industrial portfolio manager wanting to evaluate the comprehensive track record of all historical industrial "
+            "developments completed by the firm can utilize this platform to instantly isolate and assess IRRs and annualized TWRs "
+            "across specialized sector composites, streamlining historical performance diagnostics."
+        )
+        
+        st.markdown("##### 📝 2. Investor Relations & Reporting Teams")
+        st.write(
+            "When an open-end fund portfolio manager is writing quarterly reports for institutional investors, they can "
+            "instantly surface the top absolute and alpha performance drivers. This eliminates the need to involve performance analysts "
+            "to manually calculate metrics each quarter—a task that becomes exponentially harder if they want to evaluate an investment's "
+            "contribution over an extended period of time, where complex Cariño smoothing math is mandatory to prevent rounding drift."
+        )
+        
+        st.markdown("##### 🔒 3. Risk Committee & Mandate Surveillance")
+        st.write(
+            "The risk committee can systematically verify whether active fund exposures align precisely with investor mandates. "
+            "By evaluating rolling cross-correlation matrices and position-level drawdowns shipped by this platform, the committee "
+            "can uncover latent asset concentrations before they manifest as tail-risk."
+        )
+        
+    with uc2:
+        st.markdown("##### 🔍 4. Fund Operations & Outlier Detection")
+        st.write(
+            "The fund operations team can quickly identify data outliers transmitted by external fund administrators. The most effective "
+            "way to execute this audit is by reviewing returns, sub-component drivers, and trend variations in conjunction with target "
+            "benchmarks. Any detected anomalies can be caught early and reviewed with fund accountants to resolve ledger errors before "
+            "they impact official NAV distributions."
+        )
+        
+        st.markdown("##### 👑 5. Executive Leadership (The C-Suite Truth Engine)")
+        st.write(
+            "Executive teams in private asset management are continuously challenged by data fragmentation across separate systems, "
+            "which heavily degrades downstream reporting layers and strategic surveillance. This platform aggregates those fractured "
+            "property, joint-venture, and fund-tier reports, consolidating them into a single, reliable source of institutional truth."
         )
 
     st.markdown("---")
@@ -98,7 +145,7 @@ with tab_brief:
 # TAB 2: SOURCE CODE ACCESSIBILITY SYNTAX SHOWCASE (UNRESTRICTED)
 # ---------------------------------------------------------------------
 with tab_code:
-    st.markdown("## Production Source Syntax Pipeline Preview")
+    st.markdown("## Production Source Syntax Preview")
     st.write("Examine the clean engineering implementation design paradigms of the decoupled backend modules:")
     src_module = st.selectbox("Select a file block to review syntax structure:", ["src/math_core.py", "src/summary_engine.py", "src/analytics_engine.py", "src/excel_exporter.py"])
     
@@ -153,7 +200,6 @@ with tab_engine:
             xls = pd.ExcelFile(io.BytesIO(active_bytes), engine='openpyxl')
             sheets = xls.sheet_names
             
-            # --- NEUTRALIZED RE-PHRASING: BACK-OFFICE LEDGER REVIEWS ---
             st.write("---")
             st.markdown("### 🔎 Back-Office Data Reality: Live Raw Inbound Inspector")
             st.markdown(
@@ -164,7 +210,6 @@ with tab_engine:
             sheet_select = st.selectbox("Select a raw accounting ledger tab to inspect:", sheets)
             raw_df = pd.read_excel(xls, sheet_select)
             
-            # Calculate metrics to display aggregation capability
             total_rows_parsed = 0
             unique_assets = 0
             unique_composites = 0
@@ -196,7 +241,6 @@ with tab_engine:
             st.dataframe(raw_df.head(20), use_container_width=True)
             st.caption(f"📊 Showing top 20 records of tab '{sheet_select}' (Current Sheet Dimensions: {raw_df.shape[0]} rows × {raw_df.shape[1]} columns).")
                 
-            # --- HIGH-VISIBILITY INTERACTIVE RUN CALLOUT BLOCK ---
             st.write("---")
             st.markdown("### ⚙️ Execute Financial Engineering Engine & Compiler")
             st.info(
