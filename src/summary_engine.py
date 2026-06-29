@@ -67,14 +67,18 @@ def build_performance_summary(cf_df, twr_df, bm_df, config_df, investor_name, er
                 if ent_row: master_rows.append(ent_row)
 
     master_df = pd.DataFrame(master_rows).drop_duplicates(subset=['Asset Name'])
-    twr_agg = calc_6_components(twr_df.groupby(['Entity Name', 'Date'])[['Gross Investment Income Minus JV Fees', 'Gross Appreciation', 'Net Investment Income', 'Net Appreciation', 'Denominator']].sum().reset_index())
+    
+    income_col = 'Gross Investment Income Minus JV Fees' if 'Gross Investment Income Minus JV Fees' in twr_df.columns else 'Gross Investment Income Minus Fees'
+    app_col = 'Gross Appreciation' if 'Gross Appreciation' in twr_df.columns else 'Total Gross Appreciation'
+    
+    twr_agg = calc_6_components(twr_df.groupby(['Entity Name', 'Date'])[[income_col, app_col, 'Net Investment Income', 'Net Appreciation', 'Denominator']].sum().reset_index())
     indiv_twr = twr_agg.copy()
 
     comp_twr_rows = []
     for title, assets in portfolio_sections:
         sub = twr_df[twr_df['Entity Name'].isin(assets)]
         if sub.empty: continue
-        agg = sub.groupby('Date')[['Gross Investment Income Minus JV Fees', 'Gross Appreciation', 'Net Investment Income', 'Net Appreciation', 'Denominator']].sum().reset_index()
+        agg = sub.groupby('Date')[[income_col, app_col, 'Net Investment Income', 'Net Appreciation', 'Denominator']].sum().reset_index()
         agg.insert(0, 'Entity Name', f'TOTAL {title} COMPOSITE')
         comp_twr_rows.append(agg)
 
@@ -120,7 +124,6 @@ def build_performance_summary(cf_df, twr_df, bm_df, config_df, investor_name, er
             'Since Inception Net TWR': annualize_return_exact_days(get_period_twr(slice_df, 'Net Total Return', REPORTING_DATE, years=100), days_active)
         }
         
-        # In-line Risk profile allocations
         ret_col = 'Gross Total Return'
         if not slice_df[ret_col].isna().all() and len(slice_df) > 0:
             best_q_idx = slice_df[ret_col].idxmax()
