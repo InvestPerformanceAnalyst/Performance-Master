@@ -87,7 +87,6 @@ with tab_engine:
     else:
         uploaded_file = st.file_uploader("Upload Master Performance Workbook (.xlsx)", type=["xlsx"])
         if uploaded_file is not None:
-            # FIX: Pull raw bytes directly to decouple tracking from stream cursor states
             active_bytes = uploaded_file.getvalue()
             st.success("📊 Custom workbook successfully bridged into server RAM.")
 
@@ -97,14 +96,25 @@ with tab_engine:
             xls = pd.ExcelFile(io.BytesIO(active_bytes), engine='openpyxl')
             sheets = xls.sheet_names
             
-            st.markdown("### 🔎 Live Raw Database Inspector")
-            st.write("Toggle through the tabs below to view the un-scrubbed records, raw transactional rows, and complex layouts before processing:")
-            sheet_select = st.selectbox("Choose a raw workbook sheet to parse:", sheets)
-            st.dataframe(pd.read_excel(xls, sheet_select).head(12), use_container_width=True)
-            st.caption(f"Displaying top 12 rows of tab '{sheet_select}' (Dimensions: {pd.read_excel(xls, sheet_select).shape[0]} rows).")
+            # --- THE RESTORED RAW DATABASE SNEAK-PEAK INSPECTOR ---
+            st.write("---")
+            st.markdown("### 🔎 The Accounting Chaos: Live Raw Data Inspector")
+            st.markdown(
+                "Before triggering the engine calculations, use this browser to see how **unstructured and raw** the transaction ledgers are. "
+                "Notice the uneven column counts, shifting timeline fields, and zero-dollar rows typical of joint-venture database dumps:"
+            )
+            
+            sheet_select = st.selectbox("Select a raw accounting ledger tab to inspect:", sheets)
+            
+            # Read and display the raw DataFrame head immediately to establish the contrast
+            raw_df = pd.read_excel(xls, sheet_select)
+            st.dataframe(raw_df.head(20), use_container_width=True)
+            st.caption(f"📊 Showing first 20 records of raw data tab '{sheet_select}' (Total Dimensions: {raw_df.shape[0]} rows × {raw_df.shape[1]} columns).")
+            # ------------------------------------------------------
                 
             st.write("---")
             st.markdown("### ⚙️ Assemble Financial Workbook Models")
+            st.write("Clicking the execution trigger hooks standard print handles, passes the raw frames into your decoupled packages, and generates an institutional deliverable workbook inside system memory:")
             
             if st.button("Execute Portfolio Engine"):
                 st.markdown("#### 🖥️ Active Server Terminal Log Stream")
