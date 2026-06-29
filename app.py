@@ -36,91 +36,92 @@ st.write("---")
 tab_brief, tab_code, tab_engine = st.tabs(["📋 Platform Vision & Capabilities", "💻 Source Code Sneak-Peak", "⚙️ Run Analytical Calculation Core"])
 
 # ---------------------------------------------------------------------
-# TAB 1: STRATEGIC CAPABILITIES & FIRST-PERSON VISION BRIEF
+# TAB 1: STRATEGIC CAPABILITIES & FIRST-PERSON ASSET-AGNOSTIC NARRATIVE
 # ---------------------------------------------------------------------
 with tab_brief:
     st.markdown("## Bridging the Gap: From Back-Office Fragmentation to Front-Office Intelligence")
     
     st.write(
-        "I engineered this enterprise performance solution for **Affinius Capital**, where it is deployed and widely "
-        "utilized across various functional internal teams. My core objective during this initiative was to design and "
-        "architect a standardized, highly scalable reporting and analytics tech product capable of solving the structural "
-        "data fragmentation and lack of operational standardization inherent across the real estate private equity (REPE) landscape."
+        "I engineered this enterprise technology platform for **Affinius Capital**, where it is deployed and widely "
+        "utilized across various functional internal teams. While I custom-tailored this initial production release to master the "
+        "unique database mechanics and complex joint-venture layers of real estate private equity (REPE), the underlying quantitative "
+        "data architecture is entirely asset-agnostic. My core vision was to build a standardized, highly scalable calculations engine "
+        "capable of resolving the fragmented, non-standardized reporting issues that plague the alternative asset space as a whole."
     )
     st.write(
-        "To demonstrate my capabilities in bridging the gap between back-office raw outputs and front-office actionable intelligence, "
-        "I isolated a subset of my core calculation modules and turned them into this interactive web showcase. To preserve complete "
-        "institutional compliance and protect proprietary records, all underlying investment positions, asset allocations, and cash "
-        "flow history lines have been scrubbed using sanitized data that I manufactured for this presentation."
+        "Because the platform decouples the mathematical logic from the data schema, this framework can be rapidly customized, "
+        "extended, and scaled to serve **any private or public institutional asset management firm**—whether tracking private credit "
+        "drawdowns, infrastructure lifecycles, hedge fund multi-strategy vehicles, or public equity portfolios. To demonstrate my "
+        "capabilities to an external audience, I isolated a subset of my core calculation modules into this interactive app sandbox, "
+        "utilizing sanitized, manufactured data to maintain absolute institutional compliance."
     )
     
-    st.markdown("### 🔍 Core Value-Add Architecture Modules I Shipped Natively:")
+    st.markdown("### 🔍 Core Architectural Modules Designed for Multi-Asset Scalability:")
     
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("#### ⚖️ Holistic Performance Surveillance & Transparency")
+        st.markdown("#### ⚖️ Holistic Multi-Asset Performance Surveillance")
         st.write(
-            "Evaluating complex multi-tier vehicles on an isolated metric introduces systemic blind spots. I built a dual-track "
-            "financial math engine that computes **both Time-Weighted Returns (TWR) and Internal Rates of Return (IRR)** concurrently "
-            "for every single asset, fund vehicle, and customized portfolio sector composite. Displaying these metrics side-by-side "
-            "empowers portfolio managers to instantly verify operational asset-level efficiency alongside money-weighted dollar "
-            "surveillance across any targeted date horizon."
+            "Evaluating multi-tier investment vehicles on an isolated metric creates systemic blind spots. I built a dual-track "
+            "financial core that computes **both Time-Weighted Returns (TWR) and Internal Rates of Return (IRR)** concurrently "
+            "for every single underlying position, pool, and composite grouping. While configured here for real estate, this "
+            "simultaneous money-weighted and time-weighted tracking core provides a unified blueprint for private credit, "
+            "venture capital, or public funds to monitor immediate liquidity positioning alongside long-term geometric trends."
         )
-        st.markdown("#### 🎯 Active Institutional Alpha Benchmarking")
+        st.markdown("#### 🎯 Universal Alpha & Relative Attribution Matrices")
         st.write(
-            "True portfolio risk surveillance requires rigorous baseline comparison. My analytics engine automatically maps unstandardized "
-            "transaction inputs directly against core institutional indices—including NFI-ODCE and granular bottom-up NCREIF "
-            "Property Index (NPI) sectors. By anchoring these matrices to exact chronological quarters, the platform enables "
-            "front-office stakeholders to cleanly separate active operational management value-add (Alpha) from passive market tailwinds."
+            "True investment risk surveillance requires dynamic baseline comparison. My analytics engine automatically maps unstandardized "
+            "transaction layers directly against target indices—configured here for NFI-ODCE and sector-specific NCREIF Property Indices (NPI). "
+            "The data ingestion layer is architected to seamlessly route to *any* public index (MSCI, Bloomberg Barclays) or custom private "
+            "benchmark hurdle, enabling front-office stakeholders across any asset class to cleanly isolate pure active management "
+            "value-add (Alpha) from general market momentum."
         )
     with col2:
-        st.markdown("#### 📊 Instant Contribution Profiling (Top Movers & Detractors)")
+        st.markdown("#### 📊 Cross-Period Attribution Smoothing (Top Contributors & Detractors)")
         st.write(
-            "To remove ambiguity around performance drivers, I integrated a robust, GIPS-compliant **Cariño Logarithmic Attribution "
-            "core** that programmatically continuous-smooths multi-period asset returns. This allows the end-user to cut through the noise "
-            "and instantly identify the top absolute and relative contributors or detractors driving fund returns. "
+            "To remove ambiguity around performance drivers, I integrated a robust, GIPS-compliant **Cariño Logarithmic Attribution core** "
+            "that programmatically smooths cross-period returns. This mathematical framework applies continuous compounding coefficients "
+            "to scale sub-allocations, allowing users to instantly identify top performance absolute and relative contributors and detractors. "
             "What used to require hours of manual calculation of performance summary from my team of performance analysts was automated and standardized."
         )
-        st.markdown("#### 📈 Dynamic Trend Diagnostic & Historical Visualization")
+        st.markdown("#### 📈 Stateless Data Orchestration & Interactive Visualization")
         st.write(
-            "Data is only valuable if it drives a decision. I engineered automated, interactive visualization chart layers that "
-            "allow users to trace historical metrics over time. By visually packaging rolling correlation movements, J-curve cash-flow "
-            "progressions, and asset-level duration decay models, the interface turns complex backend financial ledgers into "
-            "intuitive, diagnostic trend tools for senior leadership."
+            "Data is only valuable if it drives quick, strategic front-office decisions. I engineered automated, interactive data "
+            "visualization layers that allow users to trace historical metrics over time, plotting rolling correlation trends, J-curve cash-flow "
+            "progressions, and asset duration decay vectors. More importantly, by virtualizing ingestion via `io.BytesIO` streams, the "
+            "engine processes complex arrays completely in RAM, establishing a high-throughput data pipeline that eliminates file-writing "
+            "overhead and local server directory dependencies."
         )
 
-    # --- NEW SECTION: CROSS-DEPARTMENTAL ENTERPRISE USE CASES ---
+    # --- CROSS-DEPARTMENTAL ASSET USE CASES ---
     st.write("---")
-    st.markdown("### 🏢 Cross-Functional Enterprise Use Cases")
+    st.markdown("### 🏢 Cross-Functional Institutional Use Cases")
     st.write(
-        "To illustrate how this technology product impacts day-to-day institutional operations, "
-        "consider how different teams leverage this exact engine to drive workflow efficiency:"
+        "To illustrate how this technology framework scales across a diversified investment firm, "
+        "consider how different operational teams leverage this engine to drive workflow efficiency:"
     )
     
     uc1, uc2 = st.columns(2)
     with uc1:
-        st.markdown("##### 🏗️ 1. Portfolio Management (Industrial Sector Track Record)")
+        st.markdown("##### 🏗️ 1. Portfolio Management & Strategy Track Records")
         st.write(
-            "An industrial portfolio manager wanting to evaluate the comprehensive track record of all historical industrial "
-            "developments completed by the firm can utilize this platform to instantly isolate and assess IRRs and annualized TWRs "
-            "across specialized sector composites, streamlining historical performance diagnostics."
+            "A portfolio manager wanting to evaluate the historical track record of a specific development mandate or vintage "
+            "can utilize this platform to instantly isolate and assess IRRs, multiples, and annualized TWRs across any custom composite slice, "
+            "drastically reducing historical underwriting diagnostic cycles."
         )
-        
         st.markdown("##### 📝 2. Investor Relations & Reporting Teams")
         st.write(
-            "When an open-end fund portfolio manager is writing quarterly reports for institutional investors, they can "
-            "instantly surface the top absolute and alpha performance drivers. This eliminates the need to involve performance analysts "
-            "to manually calculate metrics each quarter—a task that becomes exponentially harder if they want to evaluate an investment's "
-            "contribution over an extended period of time, where complex Cariño smoothing math is mandatory to prevent rounding drift."
+            "When writing quarterly updates for institutional clients, reporting teams can instantly surface the top absolute "
+            "and relative performance drivers. This eliminates the need to involve quantitative performance analysts to manually compute "
+            "metrics each quarter—a task that becomes exponentially harder when evaluating geometric asset contributions over an extended "
+            "period of time, where complex Cariño smoothing math is mandatory to prevent tracking drift."
         )
-        
         st.markdown("##### 🔒 3. Risk Committee & Mandate Surveillance")
         st.write(
-            "The risk committee can systematically verify whether active fund exposures align precisely with investor mandates. "
+            "The risk committee can systematically verify whether active exposures align precisely with investment mandates. "
             "By evaluating rolling cross-correlation matrices and position-level drawdowns shipped by this platform, the committee "
-            "can uncover latent asset concentrations before they manifest as tail-risk."
+            "can uncover latent asset concentrations and volatility spikes before they manifest as tail-risk."
         )
-        
     with uc2:
         st.markdown("##### 🔍 4. Fund Operations & Outlier Detection")
         st.write(
@@ -129,10 +130,9 @@ with tab_brief:
             "benchmarks. Any detected anomalies can be caught early and reviewed with fund accountants to resolve ledger errors before "
             "they impact official NAV distributions."
         )
-        
         st.markdown("##### 👑 5. Executive Leadership (The C-Suite Truth Engine)")
         st.write(
-            "Executive teams in private asset management are continuously challenged by data fragmentation across separate systems, "
+            "Executive teams in private asset management are continuously challenged by data fragmentation across separate legacy software systems, "
             "which heavily degrades downstream reporting layers and strategic surveillance. This platform aggregates those fractured "
             "property, joint-venture, and fund-tier reports, consolidating them into a single, reliable source of institutional truth."
         )
