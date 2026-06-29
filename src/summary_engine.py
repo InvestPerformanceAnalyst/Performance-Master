@@ -1,163 +1,248 @@
 # =====================================================================
-# MODULE 2: COMPOSITE FUND ROLLUP & POSITION MATRICES CORE
+# MODULE 2: PRIMARY COMPOSITE SUMMARY AGGREGATION CORE
 # =====================================================================
 import pandas as pd
 import numpy as np
-from src.math_core import xirr_custom, get_period_twr, annualize_return_exact_days, calc_6_components
+from src.math_core import xirr_custom, get_period_twr, annualize_return_exact_days, calc_6_components, chain_link
 
 def build_performance_summary(cf_df, twr_df, bm_df, config_df, investor_name, error_log, REPORTING_DATE, sec_bm=pd.DataFrame()):
-    cf_df['Advisory Fee'] = cf_df.get('Advisory Fee', 0).fillna(0)
-    cf_df['Realized Incentive Fee'] = cf_df.get('Realized Incentive Fee', 0).fillna(0)
-    cf_df['Unrealized Incentive Fee'] = cf_df.get('Unrealized Incentive Fee', 0).fillna(0)
-    cf_df['Gross CF'] = cf_df['Distributions'].fillna(0) - cf_df['Contributions'].fillna(0) - cf_df['Advisory Fee'] - cf_df['Realized Incentive Fee']
-    cf_df['Net CF'] = cf_df['Gross CF']
+    rf_cols = [c for c in config_df.columns if str(c).strip().lower() == 'risk free rate']
+    annual_rf_rate = float(config_df[rf_cols[0]].dropna().iloc[0]) if rf_cols and not config_df[rf_cols[0]].dropna().empty else 0.04
+    RISK_FREE_RATE_QTR = annual_rf_rate / 4.0
 
-    portfolio_sections = []
-    if 'Composite Grouping' in config_df.columns:
-        group_map = config_df.groupby('Composite Grouping')['Entity'].apply(list).to_dict()
-        all_investments_list = []
-        for group_name, entities in group_map.items():
-            if pd.isna(group_name): continue
-            portfolio_sections.append((str(group_name).replace(" COMPOSITE", "").strip(), entities))
-            all_investments_list.extend(entities)
-        portfolio_sections.insert(0, ("ALL INVESTMENTS", list(set(all_investments_list))))
-    else:
-        portfolio_sections.append(("ALL INVESTMENTS", cf_df['Entity Name'].unique().tolist()))
+    if 'Entity Name' in config_df.columns and 'Entity' not in config_df.columns:
+        config_df.rename(columns={'Entity Name': 'Entity'}, inplace=True)
+    elif 'Entity' not in config_df.columns:
+        error_log.append({'Module': 'Configuration', 'Entity/Group': 'Global', 'Error Details': "Missing Entity/Entity Name key allocations."})
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), []
 
-    master_rows = []
+    all_entities = config_df['Entity'].dropna().unique().tolist()
+    portfolio_sections = [("ALL INVESTMENTS", all_entities)]
 
-    def calculate_entity_metrics(name, is_composite, entities_list):
-        row = {'Asset Name': f'TOTAL {name} COMPOSITE' if is_composite else name}
-        row['Investor'] = investor_name if is_composite else config_df.loc[config_df['Entity'] == name, 'Investor Name'].fillna("Unknown").iloc[0] if not config_df[config_df['Entity'] == name].empty else "Unknown"
-        sub_cf = cf_df[cf_df['Entity Name'].isin(entities_list)].copy()
-        if sub_cf.empty: return None
+    for group_name, group_data in config_df.groupby('Composite Grouping'):
+        portfolio_sections.append((str(group_name).replace(" COMPOSITE", "").strip(), group_data['Entity'].tolist()))
 
-        row['Contributions'] = sub_cf['Contributions'].sum()
-        row['Distributions'] = sub_cf['Distributions'].sum()
-        row['Advisory Fee'] = sub_cf['Advisory Fee'].sum()
-        row['Realized Incentive Fee'] = sub_cf['Realized Incentive Fee'].sum()
-        max_date = sub_cf['Effective Date'].max()
-        row['Ending NAV'] = sub_cf[sub_cf['Effective Date'] == max_date]['Ending NAV'].sum()
-        row['Unrealized Incentive Fee'] = sub_cf[sub_cf['Effective Date'] == max_date]['Unrealized Incentive Fee'].sum()
+    if 'propType' in config_df.columns:
+        config_df['propType_clean'] = config_df['propType'].fillna('Other').replace('Land', 'Other')
+        for sector_name, sector_data in config_df.groupby('propType_clean'):
+            portfolio_sections.append((f"{str(sector_name).upper()} SECTOR", sector_data['Entity'].tolist()))
 
-        gross_agg = sub_cf.groupby('Effective Date')['Gross CF'].sum().reset_index()
-        net_agg = sub_cf.groupby('Effective Date')['Net CF'].sum().reset_index()
+    if not sec_bm.empty and 'Date' not in sec_bm.columns:
+        try:
+            sec_bm['Date'] = sec_bm['yyq'].apply(lambda yyq: pd.to_datetime(f"{int(str(yyq)[:4])}-{int(str(yyq)[4])*3}-01") + pd.offsets.MonthEnd(0))
+            sec_bm['GrossTotalReturn'] = sec_bm['tret'] - 1.0
+        except Exception: pass
 
-        def compute_xirr(agg_df, val_col):
-            d_list = agg_df['Effective Date'].tolist() + [REPORTING_DATE]
-            c_list = agg_df[val_col].tolist() + [row['Ending NAV']]
-            return xirr_custom(d_list, c_list)
+    indiv_twr = twr_df.groupby(['Entity Name', 'Date']).agg({
+        'Gross Investment Income Minus Fees': 'sum', 'Total Gross Appreciation': 'sum',
+        'Net Investment Income': 'sum', 'Net Appreciation': 'sum', 'Denominator': 'sum'
+    }).reset_index().sort_values(['Entity Name', 'Date'])
+    indiv_twr = calc_6_components(indiv_twr)
 
-        row['Gross XIRR'] = compute_xirr(gross_agg, 'Gross CF')
-        row['Net XIRR'] = compute_xirr(net_agg, 'Net CF')
-
-        paid_in = row['Contributions'] + row['Advisory Fee'] + row['Realized Incentive Fee']
-        row['DPI'] = row['Distributions'] / paid_in if paid_in > 0 else np.nan
-        row['RVPI'] = row['Ending NAV'] / paid_in if paid_in > 0 else np.nan
-        row['TVPI'] = (row['Distributions'] + row['Ending NAV']) / paid_in if paid_in > 0 else np.nan
-        row['Gross Multiple'] = (row['Distributions'] + row['Ending NAV']) / row['Contributions'] if row['Contributions'] > 0 else np.nan
-        return row
-
+    composite_twr_dfs = []
     for title, assets in portfolio_sections:
-        comp_row = calculate_entity_metrics(title, True, assets)
-        if comp_row:
-            master_rows.append(comp_row)
-            for a in assets:
-                ent_row = calculate_entity_metrics(a, False, [a])
-                if ent_row: master_rows.append(ent_row)
+        comp = twr_df[twr_df['Entity Name'].isin(assets)].groupby('Date').agg({
+            'Gross Investment Income Minus Fees': 'sum', 'Total Gross Appreciation': 'sum',
+            'Net Investment Income': 'sum', 'Net Appreciation': 'sum', 'Denominator': 'sum'
+        }).reset_index().sort_values('Date')
+        if not comp.empty:
+            comp['Entity Name'] = f'TOTAL {title} COMPOSITE'
+            composite_twr_dfs.append(calc_6_components(comp))
 
-    master_df = pd.DataFrame(master_rows).drop_duplicates(subset=['Asset Name'])
-    
-    income_col = 'Gross Investment Income Minus JV Fees' if 'Gross Investment Income Minus JV Fees' in twr_df.columns else 'Gross Investment Income Minus Fees'
-    app_col = 'Gross Appreciation' if 'Gross Appreciation' in twr_df.columns else 'Total Gross Appreciation'
-    
-    twr_agg = calc_6_components(twr_df.groupby(['Entity Name', 'Date'])[[income_col, app_col, 'Net Investment Income', 'Net Appreciation', 'Denominator']].sum().reset_index())
-    indiv_twr = twr_agg.copy()
+    composite_twr_df = pd.concat(composite_twr_dfs, ignore_index=True) if composite_twr_dfs else pd.DataFrame()
+    twr_aggregate_df = pd.concat([indiv_twr, composite_twr_df], ignore_index=True)
 
-    comp_twr_rows = []
-    for title, assets in portfolio_sections:
-        sub = twr_df[twr_df['Entity Name'].isin(assets)]
-        if sub.empty: continue
-        agg = sub.groupby('Date')[[income_col, app_col, 'Net Investment Income', 'Net Appreciation', 'Denominator']].sum().reset_index()
-        agg.insert(0, 'Entity Name', f'TOTAL {title} COMPOSITE')
-        comp_twr_rows.append(agg)
+    active_days_list, irr_validation_list, report_data = [], [], []
+    processed_entities_for_logs = set()
 
-    composite_twr_df = calc_6_components(pd.concat(comp_twr_rows, ignore_index=True)) if comp_twr_rows else pd.DataFrame()
-    all_twr = pd.concat([composite_twr_df, indiv_twr], ignore_index=True) if not composite_twr_df.empty else indiv_twr
+    def get_bm_row(slice_bm, bm_name, start_date, days_active, date_col, ret_col, net_col):
+        slice_bm = slice_bm[(slice_bm[date_col] >= start_date) & (slice_bm[date_col] <= REPORTING_DATE)].sort_values(date_col)
+        bm_q_curr = slice_bm[slice_bm[date_col] == REPORTING_DATE]
+        bm_drawdowns = (1 + slice_bm[ret_col]).cumprod() / (1 + slice_bm[ret_col]).cumprod().cummax() - 1
 
-    if 'Period' in bm_df.columns:
-        bm_df['Period'] = pd.to_datetime(bm_df['Period'])
-        bm_twr_metrics = [{'Entity Name': 'NFI-ODCE Benchmark', 'Date': p, 'Gross Total Return': bm_df[bm_df['Period'] == p]['GrossTotalReturn'].iloc[0], 'Net Total Return': bm_df[bm_df['Period'] == p]['NetTotalReturn'].iloc[0]} for p in bm_df['Period'].unique()]
-        all_twr = pd.concat([all_twr, pd.DataFrame(bm_twr_metrics)], ignore_index=True)
+        if not slice_bm.empty and slice_bm[ret_col].notna().any():
+            bm_best_q_idx = slice_bm[ret_col].idxmax()
+            b_date_bm = slice_bm.loc[bm_best_q_idx, date_col]
+            bm_best_q_date, bm_best_q_ret = f"{b_date_bm.year}-Q{b_date_bm.quarter}", slice_bm.loc[bm_best_q_idx, ret_col]
 
-    active_days_list = []
-    for asset in cf_df['Entity Name'].unique():
-        sub = cf_df[cf_df['Entity Name'] == asset]
-        first, last = sub['Effective Date'].min(), sub['Effective Date'].max()
-        if pd.notna(first) and pd.notna(last):
-            days = max((last - first).days, 1 if len(sub) > 1 else 0)
-            active_days_list.append({'Entity Name': asset, 'First Active Date': first, 'Last Active Date': last, 'Total Active Days': days})
-    active_days_df = pd.DataFrame(active_days_list)
+            bm_worst_q_idx = slice_bm[ret_col].idxmin()
+            w_date_bm = slice_bm.loc[bm_worst_q_idx, date_col]
+            bm_worst_q_date, bm_worst_q_ret = f"{w_date_bm.year}-Q{w_date_bm.quarter}", slice_bm.loc[bm_worst_q_idx, ret_col]
 
-    twr_results = []
-    for asset in master_df['Asset Name'].unique():
-        slice_df = all_twr[all_twr['Entity Name'] == asset].sort_values('Date').reset_index(drop=True)
-        if slice_df.empty: continue
-        ad_match = active_days_df[active_days_df['Entity Name'] == asset]
-        days_active = ad_match['Total Active Days'].iloc[0] if not ad_match.empty else (slice_df['Date'].max() - slice_df['Date'].min()).days
+            if len(slice_bm) >= 4:
+                bm_roll = slice_bm[ret_col].rolling(window=4).apply(lambda x: np.prod(1+x)-1, raw=False)
+                bm_best_1yr, bm_worst_1yr = bm_roll.max(), bm_roll.min()
+            else: bm_best_1yr, bm_worst_1yr = np.nan, np.nan
+        else:
+            bm_best_q_date, bm_best_q_ret, bm_worst_q_date, bm_worst_q_ret, bm_best_1yr, bm_worst_1yr = None, np.nan, None, np.nan, np.nan, np.nan
 
-        res = {
-            'Asset Name': asset,
-            'Quarterly Gross TWR': get_period_twr(slice_df, 'Gross Total Return', REPORTING_DATE, years=0.25),
-            'YTD Gross TWR': get_period_twr(slice_df, 'Gross Total Return', REPORTING_DATE, ytd=True),
-            '1-year Gross TWR': get_period_twr(slice_df, 'Gross Total Return', REPORTING_DATE, years=1),
-            '3-year Gross TWR': get_period_twr(slice_df, 'Gross Total Return', REPORTING_DATE, years=3),
-            '5-year Gross TWR': get_period_twr(slice_df, 'Gross Total Return', REPORTING_DATE, years=5),
-            '10-year Gross TWR': get_period_twr(slice_df, 'Gross Total Return', REPORTING_DATE, years=10),
-            'Since Inception Gross TWR': annualize_return_exact_days(get_period_twr(slice_df, 'Gross Total Return', REPORTING_DATE, years=100), days_active),
-            'Quarterly Net TWR': get_period_twr(slice_df, 'Net Total Return', REPORTING_DATE, years=0.25),
-            'YTD Net TWR': get_period_twr(slice_df, 'Net Total Return', REPORTING_DATE, ytd=True),
-            '1-year Net TWR': get_period_twr(slice_df, 'Net Total Return', REPORTING_DATE, years=1),
-            '3-year Net TWR': get_period_twr(slice_df, 'Net Total Return', REPORTING_DATE, years=3),
-            '5-year Net TWR': get_period_twr(slice_df, 'Net Total Return', REPORTING_DATE, years=5),
-            '10-year Net TWR': get_period_twr(slice_df, 'Net Total Return', REPORTING_DATE, years=10),
-            'Since Inception Net TWR': annualize_return_exact_days(get_period_twr(slice_df, 'Net Total Return', REPORTING_DATE, years=100), days_active)
+        bm_sharpe = ( (slice_bm[ret_col] - RISK_FREE_RATE_QTR).mean() / (slice_bm[ret_col] - RISK_FREE_RATE_QTR).std() ) * np.sqrt(4) if len(slice_bm) > 1 and (slice_bm[ret_col] - RISK_FREE_RATE_QTR).std() != 0 else np.nan
+
+        return {
+            'Asset Name': bm_name, 'Investor': '',
+            'Quarterly Gross TWR': bm_q_curr.iloc[0][ret_col] if not bm_q_curr.empty else np.nan,
+            'YTD Gross TWR': get_period_twr(slice_bm, ret_col, REPORTING_DATE, date_col=date_col, ytd=True),
+            '1-year Gross TWR': get_period_twr(slice_bm, ret_col, REPORTING_DATE, date_col=date_col, years=1),
+            '3-year Gross TWR': get_period_twr(slice_bm, ret_col, REPORTING_DATE, date_col=date_col, years=3),
+            '5-year Gross TWR': get_period_twr(slice_bm, ret_col, REPORTING_DATE, date_col=date_col, years=5),
+            'Since Inception Gross TWR': annualize_return_exact_days(chain_link(slice_bm[ret_col]), days_active),
+            'Quarterly Net TWR': bm_q_curr.iloc[0][net_col] if not bm_q_curr.empty else np.nan,
+            'YTD Net TWR': get_period_twr(slice_bm, net_col, REPORTING_DATE, date_col=date_col, ytd=True),
+            '1-year Net TWR': get_period_twr(slice_bm, net_col, REPORTING_DATE, date_col=date_col, years=1),
+            '3-year Net TWR': get_period_twr(slice_bm, net_col, REPORTING_DATE, date_col=date_col, years=3),
+            '5-year Net TWR': get_period_twr(slice_bm, net_col, REPORTING_DATE, date_col=date_col, years=5),
+            'Since Inception Net TWR': annualize_return_exact_days(chain_link(slice_bm[net_col]), days_active),
+            'Best Quarter': bm_best_q_date, 'Best Quarter Return': bm_best_q_ret,
+            'Worst Quarter': bm_worst_q_date, 'Worst Quarter Return': bm_worst_q_ret,
+            'Best 12 Months': bm_best_1yr, 'Worst 12 Months': bm_worst_1yr,
+            'Max Drawdown': bm_drawdowns.min() if not bm_drawdowns.empty else np.nan,
+            'Longest Recovery (Qtrs)': ((bm_drawdowns < 0).astype(int).groupby((bm_drawdowns == 0).astype(int).cumsum()).sum()).max() if not bm_drawdowns.empty else 0,
+            'Annualized Volatility': slice_bm[ret_col].std() * np.sqrt(4) if len(slice_bm) > 1 else np.nan,
+            'Beta': 1.00, 'Correlation (r)': 1.00, 'R-Squared': 1.00,
+            'Sharpe Ratio': bm_sharpe, 'Information Ratio': np.nan,
+            'Downside Capture': 1.0, 'Up Capture Ratio': 1.0
         }
-        
-        ret_col = 'Gross Total Return'
-        if not slice_df[ret_col].isna().all() and len(slice_df) > 0:
-            best_q_idx = slice_df[ret_col].idxmax()
-            worst_q_idx = slice_df[ret_col].idxmin()
-            res['Best Quarter'] = f"{slice_df.loc[best_q_idx, 'Date'].year}-Q{slice_df.loc[best_q_idx, 'Date'].quarter}"
-            res['Best Quarter Return'] = slice_df.loc[best_q_idx, ret_col]
-            res['Worst Quarter'] = f"{slice_df.loc[worst_q_idx, 'Date'].year}-Q{slice_df.loc[worst_q_idx, 'Date'].quarter}"
-            res['Worst Quarter Return'] = slice_df.loc[worst_q_idx, ret_col]
 
-            slice_df['Roll_12M'] = slice_df[ret_col].rolling(4).apply(lambda x: np.prod(1+x)-1)
-            res['Best 12 Months'] = slice_df['Roll_12M'].max()
-            res['Worst 12 Months'] = slice_df['Roll_12M'].min()
+    def get_performance_row(entities, name, is_composite=False):
+        try:
+            sub_cf = cf_df[cf_df['Entity Name'].isin(entities)].copy()
+            q_data = composite_twr_df[composite_twr_df['Entity Name'] == name].copy() if is_composite else indiv_twr[indiv_twr['Entity Name'] == name].copy()
+            if sub_cf.empty or q_data.empty: return None
 
-            slice_df['Cum_Ret'] = (1 + slice_df[ret_col].fillna(0)).cumprod()
-            slice_df['High_Water_Mark'] = slice_df['Cum_Ret'].cummax()
-            slice_df['Drawdown'] = (slice_df['Cum_Ret'] / slice_df['High_Water_Mark']) - 1
-            res['Max Drawdown'] = slice_df['Drawdown'].min()
+            min_date, max_date = sub_cf['Effective Date'].min(), sub_cf['Effective Date'].max()
+            days_active = (max_date - min_date).days + 1
 
-            if len(slice_df) >= 4:
-                res['Annualized Volatility'] = slice_df[ret_col].std(ddof=1) * np.sqrt(4)
-                
-            merged_bm = all_twr[all_twr['Entity Name'] == 'NFI-ODCE Benchmark']
-            if not merged_bm.empty:
-                m_risk = pd.merge(slice_df[['Date', ret_col]], merged_bm[['Date', 'Gross Total Return']], on='Date', suffixes=('_A', '_B')).dropna()
-                if len(m_risk) > 1:
-                    cov = np.cov(m_risk[f'{ret_col}_A'], m_risk['Gross Total Return_B'])[0, 1]
-                    var_b = np.var(m_risk['Gross Total Return_B'], ddof=1)
-                    if var_b > 0: res['Beta'] = cov / var_b
-                    std_a, std_b = m_risk[f'{ret_col}_A'].std(), m_risk['Gross Total Return_B'].std()
-                    if std_a > 0 and std_b > 0:
-                        res['Correlation (r)'] = cov / (std_a * std_b)
-                        res['R-Squared'] = res['Correlation (r)'] ** 2
+            irr_mask = ~((sub_cf['Ending NAV'] > 0) & (sub_cf['Effective Date'] != max_date))
+            irr_data = sub_cf[irr_mask].groupby('Effective Date').agg({'Gross Cash Flow': 'sum', 'Net Cash Flow': 'sum'}).reset_index()
+            g_irr = xirr_custom(irr_data['Effective Date'].tolist(), irr_data['Gross Cash Flow'].tolist(), guess=0.01)
+            n_irr = xirr_custom(irr_data['Effective Date'].tolist(), irr_data['Net Cash Flow'].tolist(), guess=0.01)
 
-        twr_results.append(res)
+            if name not in processed_entities_for_logs:
+                active_days_list.append({'Entity Name': name, 'First Active Date': min_date.date() if pd.notnull(min_date) else None, 'Last Active Date': max_date.date() if pd.notnull(max_date) else None, 'Total Active Days': days_active})
+                audit_df = irr_data[['Effective Date', 'Gross Cash Flow', 'Net Cash Flow']].copy()
+                audit_df.insert(0, 'Asset / Composite Name', name)
+                irr_validation_list.append(audit_df)
+                processed_entities_for_logs.add(name)
 
-    master_final = pd.merge(master_df, pd.DataFrame(twr_results), on='Asset Name', how='left')
-    return master_final, active_days_df, twr_agg, composite_twr_df, indiv_twr, portfolio_sections
+            contribs, distros = sub_cf['Contributions'].sum(), sub_cf['Distributions'].sum()
+            math_nav = sub_cf[sub_cf['Effective Date'] == max_date]['Ending NAV'].sum()
+            display_nav = math_nav if max_date == REPORTING_DATE else np.nan
+
+            dpi = distros / contribs if contribs > 0 else np.nan
+            rvpi = math_nav / contribs if contribs > 0 else np.nan
+            tvpi = (distros + math_nav) / contribs if contribs > 0 else np.nan
+
+            q_curr = q_data[q_data['Date'] == REPORTING_DATE]
+            cum_rets = (1 + q_data['Gross Total Return']).cumprod()
+            drawdowns = cum_rets / cum_rets.cummax() - 1
+
+            bm_slice = bm_df[(bm_df['Period'] >= q_data['Date'].min()) & (bm_df['Period'] <= REPORTING_DATE)]
+            merged_rets = pd.merge(q_data[['Date', 'Gross Total Return']], bm_slice[['Period', 'GrossTotalReturn']], left_on='Date', right_on='Period')
+            dn_p, up_p = merged_rets[merged_rets['GrossTotalReturn'] < 0], merged_rets[merged_rets['GrossTotalReturn'] > 0]
+
+            if not q_data.empty and q_data['Gross Total Return'].notna().any():
+                best_q_idx = q_data['Gross Total Return'].idxmax()
+                b_date = q_data.loc[best_q_idx, 'Date']
+                best_q_date, best_q_ret = f"{b_date.year}-Q{b_date.quarter}", q_data.loc[best_q_idx, 'Gross Total Return']
+
+                worst_q_idx = q_data['Gross Total Return'].idxmin()
+                w_date = q_data.loc[worst_q_idx, 'Date']
+                worst_q_date, worst_q_ret = f"{w_date.year}-Q{w_date.quarter}", q_data.loc[worst_q_idx, 'Gross Total Return']
+
+                if len(q_data) >= 4:
+                    rolling_1yr = q_data['Gross Total Return'].rolling(window=4).apply(lambda x: np.prod(1+x)-1, raw=False)
+                    best_1yr, worst_1yr = rolling_1yr.max(), rolling_1yr.min()
+                else: best_1yr, worst_1yr = np.nan, np.nan
+            else:
+                best_q_date, best_q_ret, worst_q_date, worst_q_ret, best_1yr, worst_1yr = None, np.nan, None, np.nan, np.nan, np.nan
+
+            if len(merged_rets) > 1:
+                cov = merged_rets['Gross Total Return'].cov(merged_rets['GrossTotalReturn'])
+                bm_var = merged_rets['GrossTotalReturn'].var()
+                beta = cov / bm_var if pd.notna(cov) and bm_var != 0 else np.nan
+                corr = merged_rets['Gross Total Return'].corr(merged_rets['GrossTotalReturn'])
+                r_squared = corr ** 2 if pd.notna(corr) else np.nan
+                excess_ret = merged_rets['Gross Total Return'] - RISK_FREE_RATE_QTR
+                sharpe_ratio = (excess_ret.mean() / excess_ret.std()) * np.sqrt(4) if excess_ret.std() != 0 else np.nan
+                active_ret = merged_rets['Gross Total Return'] - merged_rets['GrossTotalReturn']
+                info_ratio = (active_ret.mean() / active_ret.std()) * np.sqrt(4) if active_ret.std() != 0 else np.nan
+            else:
+                beta, corr, r_squared, sharpe_ratio, info_ratio = np.nan, np.nan, np.nan, np.nan, np.nan
+
+            return {
+                'Asset Name': name, 'Investor': investor_name,
+                'Contributions': contribs, 'Distributions': distros,
+                'Advisory Fee': sub_cf['Advisory Fee'].sum(), 'Unrealized Incentive Fee': sub_cf['Unrealized Incentive Fee'].sum(),
+                'Realized Incentive Fee': sub_cf['Realized Incentive Fee'].sum(), 'Ending NAV': display_nav,
+                'Gross XIRR': g_irr, 'Net XIRR': n_irr, 'DPI': dpi, 'RVPI': rvpi, 'TVPI': tvpi, 'Gross Multiple': tvpi,
+                'Quarterly Gross TWR': q_curr.iloc[0]['Gross Total Return'] if not q_curr.empty else np.nan,
+                'YTD Gross TWR': get_period_twr(q_data, 'Gross Total Return', REPORTING_DATE, ytd=True),
+                '1-year Gross TWR': get_period_twr(q_data, 'Gross Total Return', REPORTING_DATE, years=1),
+                '3-year Gross TWR': get_period_twr(q_data, 'Gross Total Return', REPORTING_DATE, years=3),
+                '5-year Gross TWR': get_period_twr(q_data, 'Gross Total Return', REPORTING_DATE, years=5),
+                'Since Inception Gross TWR': annualize_return_exact_days(chain_link(q_data['Gross Total Return']), days_active),
+                'Quarterly Net TWR': q_curr.iloc[0]['Net Total Return'] if not q_curr.empty else np.nan,
+                'YTD Net TWR': get_period_twr(q_data, 'Net Total Return', REPORTING_DATE, ytd=True),
+                '1-year Net TWR': get_period_twr(q_data, 'Net Total Return', REPORTING_DATE, years=1),
+                '3-year Net TWR': get_period_twr(q_data, 'Net Total Return', REPORTING_DATE, years=3),
+                '5-year Net TWR': get_period_twr(q_data, 'Net Total Return', REPORTING_DATE, years=5),
+                'Since Inception Net TWR': annualize_return_exact_days(chain_link(q_data['Net Total Return']), days_active),
+                'Best Quarter': best_q_date, 'Best Quarter Return': best_q_ret,
+                'Worst Quarter': worst_q_date, 'Worst Quarter Return': worst_q_ret,
+                'Best 12 Months': best_1yr, 'Worst 12 Months': worst_1yr,
+                'Max Drawdown': drawdowns.min() if not drawdowns.empty else np.nan,
+                'Longest Recovery (Qtrs)': ((drawdowns < 0).astype(int).groupby((drawdowns == 0).astype(int).cumsum()).sum()).max() if not drawdowns.empty else 0,
+                'Annualized Volatility': q_data['Gross Total Return'].std() * np.sqrt(4) if len(q_data) > 1 else np.nan,
+                'Beta': beta, 'Correlation (r)': corr, 'R-Squared': r_squared,
+                'Sharpe Ratio': sharpe_ratio, 'Information Ratio': info_ratio,
+                'Downside Capture': chain_link(dn_p['Gross Total Return']) / chain_link(dn_p['GrossTotalReturn']) if not dn_p.empty and chain_link(dn_p['GrossTotalReturn']) != 0 else np.nan,
+                'Up Capture Ratio': chain_link(up_p['Gross Total Return']) / chain_link(up_p['GrossTotalReturn']) if not up_p.empty and chain_link(up_p['GrossTotalReturn']) != 0 else np.nan,
+                '_start': q_data['Date'].min() if not q_data.empty else None, '_days_active': days_active
+            }
+        except Exception as e:
+            error_log.append({'Module': 'Performance Summary', 'Entity/Group': name, 'Error Details': str(e)})
+            return None
+
+    for title, assets in portfolio_sections:
+        report_data.append({'Asset Name': f'--- {title} ---'})
+        for a in assets:
+            row = get_performance_row([a], a, is_composite=False)
+            if row: report_data.append(row)
+
+        comp = get_performance_row(assets, f'TOTAL {title} COMPOSITE', is_composite=True)
+        if comp:
+            try:
+                start_date, days_active = comp['_start'], comp['_days_active']
+                is_sector = title.endswith("SECTOR")
+                if is_sector and not sec_bm.empty:
+                    sec_name = title.replace(" SECTOR", "").strip()
+                    sector_mapping = {
+                        'HOTEL': 'CO_T_Hotel', 'INDUSTRIAL': 'CO_T_Industrial', 'OFFICE': 'CO_T_Office',
+                        'RESIDENTIAL': 'CO_T_Residential', 'RETAIL': 'CO_T_Retail', 'SELF STORAGE': 'CO_T_Self Storage',
+                        'OTHER': 'CO_T_Other'
+                    }
+                    bm_iname = sector_mapping.get(sec_name, 'CO_T_Other')
+                    slice_bm = sec_bm[sec_bm['iname'] == bm_iname].copy()
+                    bm_name = f"NCREIF {sec_name.title()} Benchmark"
+                    bm_row = get_bm_row(slice_bm, bm_name, start_date, days_active, date_col='Date', ret_col='GrossTotalReturn', net_col='GrossTotalReturn')
+                else:
+                    slice_bm = bm_df.copy()
+                    bm_name = "NFI-ODCE Benchmark"
+                    bm_row = get_bm_row(slice_bm, bm_name, start_date, days_active, date_col='Period', ret_col='GrossTotalReturn', net_col='NetTotalReturn')
+
+                rel_row = {'Asset Name': f'+/- Relative to {bm_name}', 'Investor': ''}
+                for k in [col for col in bm_row.keys() if col not in ['Asset Name', 'Investor']]:
+                    c_val = comp.get(k, np.nan)
+                    b_val = bm_row.get(k, np.nan)
+                    rel_row[k] = "" if (isinstance(c_val, str) or isinstance(b_val, str)) else (c_val - b_val if not (pd.isna(c_val) or pd.isna(b_val)) else np.nan)
+
+                rel_row['Information Ratio'] = comp.get('Information Ratio', np.nan)
+                report_data.extend([comp, bm_row, rel_row, {'Asset Name': ''}])
+            except Exception as e:
+                error_log.append({'Module': 'Benchmark Mapping', 'Entity/Group': title, 'Error Details': str(e)})
+
+    master_df = pd.DataFrame(report_data).drop(columns=['_start', '_days_active'], errors='ignore')
+    active_days_df = pd.DataFrame(active_days_list)
+    irr_val_df = pd.concat(irr_validation_list, ignore_index=True) if irr_validation_list else pd.DataFrame()
+
+    return master_df, active_days_df, irr_val_df, twr_aggregate_df, composite_twr_df, indiv_twr, portfolio_sections
