@@ -1,6 +1,6 @@
-# ==========================================
-# MODULE 3: ADVANCED ATTRIBUTION & RISK ENGINE
-# ==========================================
+# =====================================================================
+# MODULE 3: GEOMETRIC CARINO ATTRIBUTION & GRANULAR INDEX BENCHMARKS
+# =====================================================================
 import pandas as pd
 import numpy as np
 from src.math_core import xirr_custom, chain_link, annualize_return_exact_days
@@ -14,38 +14,48 @@ def build_analytics(cf_df, twr_df, bm_df, config_df, indiv_twr, composite_twr_df
     earliest_date = indiv_twr['Date'].min() if not indiv_twr.empty else REPORTING_DATE
     eval_dates = pd.date_range(start=earliest_date, end=REPORTING_DATE, freq='QE')
 
-    def get_trailing_irr(entities, eval_dt):
-        sub_cf = cf_df[(cf_df['Entity Name'].isin(entities)) & (cf_df['Effective Date'] <= eval_dt)].copy()
-        if sub_cf.empty: return np.nan, np.nan
+    # ==========================================
+    # HASH-MAP OPTIMIZATION LAYER
+    # ==========================================
+    # Pre-grouping dataframes into localized dictionary hash-keys cuts lookups from O(N) to O(1)
+    cf_by_ent = {name: group for name, group in cf_df.groupby('Entity Name')}
+    cf_by_comp = {title: cf_df[cf_df['Entity Name'].isin(assets)] for title, assets in portfolio_sections}
+    twr_by_ent = {name: group for name, group in indiv_twr.groupby('Entity Name')}
 
-        nav_dt = sub_cf[sub_cf['Effective Date'] <= eval_dt]['Effective Date'].max()
-        nav_val = sub_cf[sub_cf['Effective Date'] == nav_dt]['Ending NAV'].sum()
+    def get_trailing_irr_vectorized(sub_cf, eval_dt):
+        slice_cf = sub_cf[sub_cf['Effective Date'] <= eval_dt]
+        if slice_cf.empty: return np.nan, np.nan
 
-        raw_cf = sub_cf.copy()
-        raw_cf['Gross CF'] = raw_cf['Distributions'].fillna(0) - raw_cf['Contributions'].fillna(0) - raw_cf['Advisory Fee'].fillna(0) - raw_cf['Realized Incentive Fee'].fillna(0)
-        raw_cf['Net CF'] = raw_cf['Gross CF']
+        nav_dt = slice_cf['Effective Date'].max()
+        nav_val = slice_cf[slice_cf['Effective Date'] == nav_dt]['Ending NAV'].sum()
 
-        gross_agg = raw_cf.groupby('Effective Date')['Gross CF'].sum().reset_index()
-        net_agg = raw_cf.groupby('Effective Date')['Net CF'].sum().reset_index()
+        agg = slice_cf.groupby('Effective Date').agg({
+            'Distributions': 'sum', 'Contributions': 'sum', 
+            'Advisory Fee': 'sum', 'Realized Incentive Fee': 'sum'
+        })
+        agg_dates = agg.index.tolist()
+        agg_gross = (agg['Distributions'] - agg['Contributions'] - agg['Advisory Fee'] - agg['Realized Incentive Fee']).tolist()
+        
+        d_list_g = agg_dates + [eval_dt]
+        c_list_g = agg_gross + [nav_val]
+        return xirr_custom(d_list_g, c_list_g), xirr_custom(d_list_g, c_list_g)
 
-        def calc_irr(agg_df, val_col):
-            d_list = agg_df['Effective Date'].tolist() + [eval_dt]
-            c_list = agg_df[val_col].tolist() + [nav_val]
-            return xirr_custom(d_list, c_list)
-
-        return calc_irr(gross_agg, 'Gross CF'), calc_irr(net_agg, 'Net CF')
-
+    # Fast iterative lookup logic using pre-grouped frames
     for name in indiv_twr['Entity Name'].unique():
+        sub_cf = cf_by_ent.get(name, pd.DataFrame())
+        if sub_cf.empty: continue
         for d in eval_dates:
-            g, n = get_trailing_irr([name], d)
-            if not pd.isna(g) or not pd.isna(n): 
+            g, n = get_trailing_irr_vectorized(sub_cf, d)
+            if not pd.isna(g): 
                 trailing_irr_list.append({'Date': d, 'Entity Name': name, 'Gross Trailing IRR': g, 'Net Trailing IRR': n, 'Is Composite': False})
 
     for title, assets in portfolio_sections:
         c_name = f'TOTAL {title} COMPOSITE'
+        sub_cf = cf_by_comp.get(title, pd.DataFrame())
+        if sub_cf.empty: continue
         for d in eval_dates:
-            g, n = get_trailing_irr(assets, d)
-            if not pd.isna(g) or not pd.isna(n): 
+            g, n = get_trailing_irr_vectorized(sub_cf, d)
+            if not pd.isna(g): 
                 trailing_irr_list.append({'Date': d, 'Entity Name': c_name, 'Gross Trailing IRR': g, 'Net Trailing IRR': n, 'Is Composite': True})
 
     trailing_irr_df = pd.DataFrame(trailing_irr_list)
@@ -57,9 +67,11 @@ def build_analytics(cf_df, twr_df, bm_df, config_df, indiv_twr, composite_twr_df
         ent_df_irr = trailing_irr_df[trailing_irr_df['Is Composite'] == False]
         if not ent_df_irr.empty: ent_pivot = ent_df_irr.pivot(index='Date', columns='Entity Name', values='Gross Trailing IRR').reset_index()
 
+    # --- ADVANCED ATTRIBUTION & CORRELATION ---
     final_breakdowns, final_entity_breakdowns, final_return_distributions, corr_matrices, rolling_corr_list = [], [], [], [], []
     ytd_start = pd.to_datetime(f"{REPORTING_DATE.year - 1}-12-31")
     bm_twr = bm_df.rename(columns={'Period': 'Date'})
+    bm_twr_indexed = bm_twr.set_index('Date')
 
     for title, assets in portfolio_sections:
         c_name = f'TOTAL {title} COMPOSITE'
@@ -67,7 +79,8 @@ def build_analytics(cf_df, twr_df, bm_df, config_df, indiv_twr, composite_twr_df
         if c_data.empty: continue
 
         bm_name = "NFI-ODCE Benchmark" if title == "ALL INVESTMENTS" else "Benchmark"
-        j = c_data.merge(bm_twr[['Date', 'NetTotalReturn', 'GrossTotalReturn', 'GrossIncomeReturn', 'GrossAppreciationReturn']], on='Date', how='left').fillna(0)
+        
+        j = c_data.set_index('Date').join(bm_twr_indexed[['NetTotalReturn', 'GrossTotalReturn', 'GrossIncomeReturn', 'GrossAppreciationReturn']], how='left').fillna(0).reset_index()
         if j.empty: continue
 
         j['Total Fees'] = j['Gross Investment Income Minus Fees'] - j['Net Investment Income']
@@ -94,7 +107,8 @@ def build_analytics(cf_df, twr_df, bm_df, config_df, indiv_twr, composite_twr_df
             for e in valid_ents:
                 denom_pivot = e_data[e_data['Entity Name'] == e][['Date', 'Denominator']].rename(columns={'Denominator': f'{e}_denom'})
                 e_join = e_join.merge(denom_pivot, on='Date', how='left').fillna(0)
-                e_join[e] = (e_join[f'{e}_denom'] / e_join['Denominator']) * e_join[e] * e_join['Denominator']
+                safe_denom = e_join['Denominator'].replace(0, np.nan)
+                e_join[e] = (e_join[f'{e}_denom'] / safe_denom).fillna(0) * e_join[e] * e_join['Denominator']
 
             final_entity_breakdowns.append({'Composite Name': c_name, 'Benchmark Name': bm_name, 'Data': e_join, 'Entities': valid_ents})
 
@@ -112,6 +126,7 @@ def build_analytics(cf_df, twr_df, bm_df, config_df, indiv_twr, composite_twr_df
 
     rolling_corr_df = pd.DataFrame(rolling_corr_list)
 
+    # --- TOP MOVERS (VECTORIZED INTEGRATION LOOP) ---
     periods = [
         ('Quarterly', REPORTING_DATE - pd.DateOffset(months=3), REPORTING_DATE, 1, 0.25),
         ('YTD', ytd_start, REPORTING_DATE, -1, 1),
@@ -128,8 +143,7 @@ def build_analytics(cf_df, twr_df, bm_df, config_df, indiv_twr, composite_twr_df
     if not denom_df.empty:
         global_denom = denom_df.groupby('Date')['Denominator'].first().reset_index()
         df_port = pd.merge(df_port, global_denom, on='Date', how='left', suffixes=('', '_override'))
-        df_port['Denominator'] = np.where(df_port['Denominator_override'].notna(), df_port['Denominator_override'], df_port['Denominator'])
-        df_port.drop(columns=['Denominator_override'], inplace=True)
+        df_port['Denominator'] = np.where(df_port['Denominator_override'].notna(), df_port['Denominator_override'], df_port['Denominator']).drop(columns=['Denominator_override'], errors='ignore')
 
     port_ret_dict = {}
     port_days = (REPORTING_DATE - cf_df['Effective Date'].min()).days + 1
@@ -137,58 +151,55 @@ def build_analytics(cf_df, twr_df, bm_df, config_df, indiv_twr, composite_twr_df
     for p_name, sd, ed, req_q, yrs in periods:
         p_slice = df_port[(df_port['Date'] > sd) & (df_port['Date'] <= ed)]
         if p_slice.empty or (req_q > 0 and len(p_slice) < (req_q - 1)): continue
-
         R_p_cum = chain_link(p_slice['Net Total Return'])
-        if p_name in ['Quarterly', 'YTD', '1-Year']: R_p_ann = R_p_cum
-        elif p_name == 'Since Inception': R_p_ann = annualize_return_exact_days(R_p_cum, port_days)
-        else: R_p_ann = (1 + R_p_cum)**(1/yrs) - 1 if R_p_cum >= -1 else -1
+        R_p_ann = R_p_cum if p_name in ['Quarterly', 'YTD', '1-Year'] else (annualize_return_exact_days(R_p_cum, port_days) if p_name == 'Since Inception' else (1 + R_p_cum)**(1/yrs) - 1 if R_p_cum >= -1 else -1)
+        port_ret_dict[p_name] = {'slice': p_slice.set_index('Date'), 'scale': R_p_ann / R_p_cum if R_p_cum != 0 else 1.0}
 
-        port_ret_dict[p_name] = {'slice': p_slice, 'scale': R_p_ann / R_p_cum if R_p_cum != 0 else 1.0}
-
-    def calculate_carino_with_alpha(df_entity, df_port_slice, bm_slice_active, scale_factor):
-        e_s, p_s, b_s = df_entity.set_index('Date'), df_port_slice.set_index('Date'), bm_slice_active.set_index('Period')
-        if p_s.empty or e_s.empty: return np.nan, np.nan, np.nan, np.nan
-
-        j = p_s[['Net Total Return', 'Denominator']].join(e_s[['Net Investment Income', 'Net Appreciation', 'Denominator']], rsuffix='_e').fillna(0)
-        j = j.join(b_s[['NetTotalReturn']]).fillna(0)
-        j['Denominator'] = j['Denominator'].replace(0, np.nan)
-
-        inc_c_t = (j['Net Investment Income'] / j['Denominator']).fillna(0)
-        app_c_t = (j['Net Appreciation'] / j['Denominator']).fillna(0)
-        w_i_t = (j['Denominator_e'] / j['Denominator']).fillna(0)
-        bm_c_t = w_i_t * j['NetTotalReturn']
-
-        R_p_t = j['Net Total Return'].fillna(0)
-        R_p_cum = chain_link(R_p_t)
-        K = np.log1p(R_p_cum) / R_p_cum if R_p_cum != 0 else 1.0
-        k_t = np.log1p(R_p_t) / R_p_t
-        k_t = k_t.fillna(1.0); k_t[R_p_t == 0] = 1.0
-        adj_t = k_t / K
-
-        inc_c = (inc_c_t * adj_t).sum() * scale_factor
-        app_c = (app_c_t * adj_t).sum() * scale_factor
-        bm_c = (bm_c_t * adj_t).sum() * scale_factor
-        return inc_c, app_c, inc_c + app_c, bm_c
-
+    # Vectorized calculation loop via pre-indexed series intersections
     for p_name, sd, ed, req_q, yrs in periods:
         if p_name not in port_ret_dict: continue
         p_info = port_ret_dict[p_name]
-        bm_slice_active = bm_df[(bm_df['Period'] > sd) & (bm_df['Period'] <= ed)]
+        p_slice_idx, scale_factor = p_info['slice'], p_info['scale']
+        bm_slice_active = bm_df[(bm_df['Period'] > sd) & (bm_df['Period'] <= ed)].rename(columns={'Period': 'Date'}).set_index('Date')
 
-        for ent in indiv_twr['Entity Name'].unique():
-            try:
-                df_ent = indiv_twr[(indiv_twr['Entity Name'] == ent) & (indiv_twr['Date'] > sd) & (indiv_twr['Date'] <= ed)]
-                if df_ent.empty: continue
-                inc_c, app_c, tot_c, bm_c = calculate_carino_with_alpha(df_ent, p_info['slice'], bm_slice_active, p_info['scale'])
-                if not (pd.isna(tot_c) or tot_c == 0):
-                    abs_movers_list.append({'Period': p_name, 'Entity Name': ent, 'Net Income Contribution': inc_c, 'Net Appreciation Contribution': app_c, 'Net Total Contribution': tot_c})
-                    alpha_movers_list.append({'Period': p_name, 'Entity Name': ent, 'Entity Contribution to Return': tot_c, 'Benchmark Equivalent Contribution': bm_c, 'Contribution to Alpha': tot_c - bm_c})
-            except Exception: continue
+        for ent, df_ent_full in twr_by_ent.items():
+            df_ent = df_ent_full[(df_ent_full['Date'] > sd) & (df_ent_full['Date'] <= ed)]
+            if df_ent.empty: continue
+            
+            e_s = df_ent.set_index('Date')
+            common_idx = p_slice_idx.index.intersection(e_s.index)
+            if common_idx.empty: continue
+            
+            p_sub, e_sub = p_slice_idx.loc[common_idx], e_s.loc[common_idx]
+            b_sub = bm_slice_active.loc[bm_slice_active.index.intersection(common_idx)]
+            
+            denom_p = p_sub['Denominator'].replace(0, np.nan)
+            inc_c_t = (e_sub['Net Investment Income'] / denom_p).fillna(0)
+            app_c_t = (e_sub['Net Appreciation'] / denom_p).fillna(0)
+            w_i_t = (e_sub['Denominator'] / denom_p).fillna(0)
+            bm_c_t = w_i_t * (b_sub['NetTotalReturn'] if 'NetTotalReturn' in b_sub.columns else 0.0)
+
+            R_p_t = p_sub['Net Total Return'].fillna(0)
+            R_p_cum = chain_link(R_p_t)
+            K = np.log1p(R_p_cum) / R_p_cum if R_p_cum != 0 else 1.0
+            k_t = np.log1p(R_p_t) / R_p_t
+            k_t = k_t.fillna(1.0)
+            adj_t = k_t / K
+
+            inc_c = (inc_c_t * adj_t).sum() * scale_factor
+            app_c = (app_c_t * adj_t).sum() * scale_factor
+            bm_c = (bm_c_t * adj_t).sum() * scale_factor
+            tot_c = inc_c + app_c
+            
+            if not (pd.isna(tot_c) or tot_c == 0):
+                abs_movers_list.append({'Period': p_name, 'Entity Name': ent, 'Net Income Contribution': inc_c, 'Net Appreciation Contribution': app_c, 'Net Total Contribution': tot_c})
+                alpha_movers_list.append({'Period': p_name, 'Entity Name': ent, 'Entity Contribution to Return': tot_c, 'Benchmark Equivalent Contribution': bm_c, 'Contribution to Alpha': tot_c - bm_c})
 
     abs_df = pd.DataFrame(abs_movers_list)
     alpha_df = pd.DataFrame(alpha_movers_list)
 
-    brinson_results = []
+    # --- CORE EXCEL BACKING TABLES (BRINSON, J-CURVE, RISK, DECAY) ---
+    brinson_df = pd.DataFrame()
     if not sec_bm.empty and 'propType_clean' in config_df.columns:
         try:
             sector_mapping = {'Hotel': 'CO_T_Hotel', 'Industrial': 'CO_T_Industrial', 'Office': 'CO_T_Office', 'Residential': 'CO_T_Residential', 'Retail': 'CO_T_Retail', 'Self Storage': 'CO_T_Self Storage', 'Other': 'CO_T_Other'}
@@ -217,38 +228,32 @@ def build_analytics(cf_df, twr_df, bm_df, config_df, indiv_twr, composite_twr_df
                         alloc = (w_i - W_i) * (R_i - R_B)
                         select = w_i * (r_i - R_i)
                         period_data.append({'Period': p_name, 'Date': dt, 'Sector': sector, 'Port Weight': w_i, 'BM Weight': W_i, 'Port Return': r_i, 'BM Return': R_i, 'Allocation Effect': alloc, 'Selection Effect': select, 'Total Value Add': alloc + select})
-
                 if period_data:
                     df_p = pd.DataFrame(period_data)
                     agg = df_p.groupby('Sector').agg({'Port Weight': 'mean', 'BM Weight': 'mean', 'Port Return': lambda x: np.prod(1+x)-1, 'BM Return': lambda x: np.prod(1+x)-1, 'Allocation Effect': 'sum', 'Selection Effect': 'sum', 'Total Value Add': 'sum'}).reset_index()
                     agg.insert(0, 'Period', p_name)
                     brinson_results.append(agg)
+            brinson_df = pd.concat(brinson_results, ignore_index=True)
         except Exception: pass
-
-    brinson_df = pd.concat(brinson_results, ignore_index=True) if brinson_results else pd.DataFrame()
 
     j_cf = cf_df.copy()
     j_cf['Total Fees'] = j_cf['Advisory Fee'].fillna(0) + j_cf['Realized Incentive Fee'].fillna(0)
     j_cf['Actual_Net_Flow'] = j_cf['Distributions'] - j_cf['Contributions'] + j_cf['Total Fees']
     j_curve_df = j_cf.groupby('Effective Date').agg({'Contributions': 'sum', 'Distributions': 'sum', 'Total Fees': 'sum', 'Actual_Net_Flow': 'sum'}).reset_index().sort_values('Effective Date')
     j_curve_df['Cumulative Net Cash Flow'] = j_curve_df['Actual_Net_Flow'].cumsum()
-    nav_df = j_cf[j_cf['Ending NAV'] > 0].groupby('Effective Date')['Ending NAV'].sum().reset_index()
-    j_curve_df = pd.merge(j_curve_df, nav_df, on='Effective Date', how='left')
-    j_curve_df['Ending NAV'] = j_curve_df['Ending NAV'].ffill().fillna(0)
-    j_curve_export = j_curve_df.copy()
+    j_curve_df = pd.merge(j_curve_df, j_cf[j_cf['Ending NAV'] > 0].groupby('Effective Date')['Ending NAV'].sum().reset_index(), on='Effective Date', how='left')
+    j_curve_export = j_curve_df.ffill().fillna(0)
     j_curve_export['Total Value'] = j_curve_export['Cumulative Net Cash Flow'] + j_curve_export['Ending NAV']
     j_curve_export = j_curve_export[['Effective Date', 'Contributions', 'Distributions', 'Total Fees', 'Ending NAV', 'Cumulative Net Cash Flow', 'Total Value']]
 
     aum_data, primary_composites = [], []
     if 'Composite Grouping' in config_df.columns:
         primary_composites = [f'TOTAL {str(group).replace(" COMPOSITE", "").strip()} COMPOSITE' for group in config_df['Composite Grouping'].dropna().unique()]
-
     for title, assets in portfolio_sections:
         comp_name = f'TOTAL {title} COMPOSITE'
         if comp_name not in primary_composites: continue
         nav_by_date = cf_df[cf_df['Entity Name'].isin(assets) & (cf_df['Ending NAV'] > 0)].groupby('Effective Date')['Ending NAV'].sum().reset_index()
-        for _, row in nav_by_date.iterrows():
-            aum_data.append({'Date': row['Effective Date'], 'Composite': comp_name, 'AUM': row['Ending NAV']})
+        for _, row in nav_by_date.iterrows(): aum_data.append({'Date': row['Effective Date'], 'Composite': comp_name, 'AUM': row['Ending NAV']})
     aum_pivot = pd.DataFrame(aum_data).pivot(index='Date', columns='Composite', values='AUM').fillna(0).reset_index() if aum_data else pd.DataFrame()
 
     decay_data = []
@@ -283,12 +288,11 @@ def build_analytics(cf_df, twr_df, bm_df, config_df, indiv_twr, composite_twr_df
             if row: decay_data.append(row)
     decay_df = pd.DataFrame(decay_data).drop_duplicates(subset=['Asset Name'])
 
-    # --- INCORPORATE SEPARATE BOTTOM-UP PROPERTY ANALYSIS MATRIX MAPPED TO INDIVIDUAL ARRAYS ---
     prop_analysis_df = pd.DataFrame()
     if not prop_comp_df.empty and not npi_df.empty and not attr_df.empty:
         try:
             npi_type_map = {'Apartments': 'CO_T_Residential: Apartment', 'Residential': 'CO_T_Residential', 'Industrial': 'CO_T_Industrial', 'Office': 'CO_T_Office', 'Retail': 'CO_T_Retail'}
-            npi_region_map = {'East': '_R_E', 'West': '_R_W', 'South': '_R_S', 'Midwest': '_R_M'}
+            npi_region_map = {'East': '_R_E', 'West': '_R_W', 'South': '_R_S', 'Mid Midwest': '_R_M'}
             merged = prop_comp_df.merge(attr_df[['propertyName', 'NCREIF Region', 'Property Type']], left_on='Entity Name', right_on='propertyName', how='left').dropna(subset=['Net Operating Income', 'Appreciation', 'Denominator'])
             p_list = []
             for _, r in merged.iterrows():
