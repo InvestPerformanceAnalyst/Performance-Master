@@ -7,7 +7,7 @@ Original file is located at
     https://colab.research.google.com/drive/1QoSWx88sLaEjD5OHrmmXS_n5T_tzDZDM
 """
 
-!pip install xlsxwriter
+
 # ==========================================
 # MODULE 1: SETUP & CORE FINANCIAL HELPERS
 # ==========================================
