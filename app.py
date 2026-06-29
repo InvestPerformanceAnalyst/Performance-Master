@@ -4,6 +4,7 @@
 import streamlit as st
 import pandas as pd
 import io
+import os
 import sys
 from src.summary_engine import build_performance_summary
 from src.analytics_engine import build_analytics
@@ -33,7 +34,7 @@ tab_brief, tab_code, tab_engine = st.tabs(["📋 Platform Overview", "💻 Sourc
 # ---------------------------------------------------------------------
 with tab_brief:
     st.markdown("## Platform Brief & Functional Value Proposition")
-    st.write("This platform is designed to replace manual spreadsheet calculations in private equity performance tracking with an automated Python pipeline.")
+    st.write("This platform replaces manual spreadsheet calculations in private equity performance tracking with an automated Python pipeline.")
     
     st.markdown("""
     ### Key Engineering Capabilities Addressed:
@@ -55,7 +56,6 @@ with tab_code:
     
     src_module = st.selectbox("Select a decoupled production file to review:", ["src/math_core.py", "src/summary_engine.py", "src/analytics_engine.py", "src/excel_exporter.py"])
     
-    # Simple dynamic mapping dictionary layout to read code files on-the-fly
     try:
         with open(src_module, "r") as f:
             st.code(f.read(), language="python")
@@ -67,35 +67,62 @@ with tab_code:
 # ---------------------------------------------------------------------
 with tab_engine:
     st.markdown("## Interactive Calculation Sandbox")
-    st.write("Upload a target master portfolio spreadsheet below. You can preview the raw un-scrubbed records live, monitor the real-time terminal compile console log steps, and extract the generated institutional presentation model.")
+    st.write("Test the engine below. You can view the raw input workbook data live, step through the runtime compilation tracking codes, and download the institutional compiled output report.")
     
-    uploaded_file = st.file_uploader("Upload Master Performance Data Workbook (.xlsx)", type=["xlsx"])
+    # Define standard repository path for the demo file
+    DEMO_FILE_PATH = "src/Performance-Master 918000 4.xlsx"
     
-    if uploaded_file is not None:
-        xls = pd.ExcelFile(uploaded_file)
+    # Streamlit sidebar controls for ingestion sourcing
+    st.sidebar.markdown("### 📥 Source File Settings")
+    data_source = st.sidebar.radio(
+        "Choose Inbound Data Feed:",
+        ["Use Live Embedded Demo File (Recommended)", "Upload Custom Master Workbook"]
+    )
+    
+    active_workbook = None
+    
+    if data_select := (data_select if 'data_select' in locals() else None):
+        pass
+
+    if data_select := ("Use Live" in data_select if 'data_select' in locals() else (data_source == "Use Live Embedded Demo File (Recommended)")):
+        if os.path.exists(DEMO_FILE_PATH):
+            active_workbook = DEMO_FILE_PATH
+            st.success("✅ Connected natively to embedded institutional sample file (`Performance-Master 918000 4.xlsx`).")
+        else:
+            st.warning(f"⚠️ Embedded demo file not detected at `{DEMO_FILE_PATH}`. Please upload a custom workbook below or verify your repository folder structure.")
+    else:
+        uploaded_file = st.file_uploader("Upload Master Performance Data Workbook (.xlsx)", type=["xlsx"])
+        if uploaded_file is not None:
+            active_workbook = uploaded_file
+            st.success("📊 Custom investor workbook successfully bridged into server RAM.")
+
+    # Execute downstream tracking logic only if a workbook handle is validated
+    if active_workbook is not None:
+        xls = pd.ExcelFile(active_workbook)
         sheets = xls.sheet_names
         
-        st.success(f"Workbook connection established. Detected database tabs: {sheets}")
+        # Live Database Previewer Block showing how raw/chaotic the data is
+        st.markdown("### 🔎 Live Raw Database Inspector")
+        st.write("Toggle through the raw sheets below to examine the un-scrubbed transactional rows, chaotic ledgers, and complex structural layers before running the compiler logic:")
         
-        # Subsegment: Show raw elements live
-        with st.expander("🔍 Inspect Selected Inbound Sheet Database Live"):
-            sheet_select = st.selectbox("Select target tab row pool:", sheets)
-            st.dataframe(pd.read_excel(xls, sheet_select).head(10), use_container_width=True)
-            st.caption("Displaying first 10 data rows from selected raw data array block.")
+        sheet_select = st.selectbox("Choose a raw database tab to analyze:", sheets)
+        raw_df = pd.read_excel(xls, sheet_select)
+        st.dataframe(raw_df.head(12), use_container_width=True)
+        st.caption(f"Displaying top 12 raw data records from sheet '{sheet_select}' (Total Matrix Shape: {raw_df.shape[0]} rows x {raw_df.shape[1]} columns).")
             
         st.write("---")
-        st.markdown("### Process Workbook Assembly")
-        st.write("Trigger the button below to bind stdout pipelines and activate the server-side analysis compiler:")
+        st.markdown("### ⚙️ Run Calculations Core Pipeline")
+        st.write("Triggering the engine hooks standard print pipelines, routes variables through the engineering packages, and dynamically generates the formatted output sheet directly inside RAM.")
         
         if st.button("Execute Portfolio Engine"):
-            st.markdown("#### 🖥️ Active Server Terminal Log Stream")
+            st.markdown("#### 🖥️ Active Server Terminal Log Stream (Stdout)")
             console_box = st.empty()
             
             # Route print handles to web component view
             sys.stdout = StreamlitConsoleRedirect(console_box)
             
             try:
-                print("Status Code 100: Initializing spreadsheet workbook array memory maps...")
+                print("Log Trace 100: Initializing spreadsheet workbook array memory maps...")
                 cf_df = pd.read_excel(xls, 'Cashflow')
                 twr_df = pd.read_excel(xls, 'TWR')
                 config_df = pd.read_excel(xls, 'Configuration') if 'Configuration' in sheets else pd.DataFrame()
@@ -106,22 +133,27 @@ with tab_engine:
                 npi_df = pd.read_excel(xls, 'Expanded NPI Detail') if 'Expanded NPI Detail' in sheets else pd.DataFrame()
                 prop_comp_df = pd.read_excel(xls, 'Property Components') if 'Property Components' in sheets else pd.DataFrame()
 
-                print("Status Code 102: Data streams locked. Standardizing date column frames...")
+                if 'Configuration' not in sheets:
+                    print("Log Trace 101: Configuration tab absent. Building automatic flat portfolio roster mapping...")
+                    unique_ents = cf_df['Entity Name'].unique()
+                    config_df = pd.DataFrame({'Entity': unique_ents, 'Investor Name': ["Unknown Investor"] * len(unique_ents)})
+
+                print("Log Trace 102: Data extraction successful. Formatting temporal alignment indexes...")
                 cf_df['Effective Date'] = pd.to_datetime(cf_df['Effective Date'])
                 twr_df['Date'] = pd.to_datetime(twr_df['Date'])
                 REPORTING_DATE = twr_df['Date'].max()
                 print(f" -> Portfolio measurement lock boundary confirmed at: {REPORTING_DATE.strftime('%Y-%m-%d')}")
 
-                print("Status Code 200: Processing Module 2 Money-Weighted XIRR matrices & TWR fund link summaries...")
+                print("Log Trace 200: Executing Module 2 Money-Weighted XIRR matrices & TWR fund link summaries...")
                 master_df, active_days_df, twr_agg, composite_twr_df, indiv_twr, portfolio_sections = build_performance_summary(
                     cf_df, twr_df, bm_df, config_df, "Housing Platform Fund LP", [], REPORTING_DATE
                 )
                 print(f" -> Computed {master_df.shape[0]} unique portfolio composite clusters.")
 
-                print("Status Code 300: Processing Module 3 Advanced Geometric Attribution and Optional NPI Grid Loops...")
+                print("Log Trace 300: Executing Module 3 Advanced Geometric Attribution and Optional NPI Grid Loops...")
                 error_log = []
                 trailing_irr_df, trailing_pivot, ent_pivot, final_breakdowns, final_entity_breakdowns, _, _, _, _, _, _, _, _, _, prop_analysis_df = build_analytics(
-                    cf_df, twr_df, bm_df, config_df, indiv_twt=indiv_twr, composite_twr_df=composite_twr_df, 
+                    cf_df, twr_df, bm_df, config_df, indiv_twr=indiv_twr, composite_twr_df=composite_twr_df, 
                     portfolio_sections=portfolio_sections, error_log=error_log, REPORTING_DATE=REPORTING_DATE,
                     attr_df=attr_df, npi_df=npi_df, prop_comp_df=prop_comp_df
                 )
@@ -131,7 +163,7 @@ with tab_engine:
                 else:
                     print(" -> Notice: Optional property tabs not detected. Building default blended composites.")
 
-                print("Status Code 400: Running Module 4 spreadsheet workbook binary output array layout compilation...")
+                print("Log Trace 400: Running Module 4 spreadsheet workbook binary output array layout compilation...")
                 excel_buffer = io.BytesIO()
                 export_to_excel(excel_buffer, master_df, active_days_df, trailing_irr_df, trailing_pivot, ent_pivot, final_breakdowns, final_entity_breakdowns, [], [], prop_analysis_df)
                 excel_buffer.seek(0)
@@ -153,4 +185,4 @@ with tab_engine:
                 import traceback
                 st.code(traceback.format_exc())
     else:
-        st.info("💡 Awaiting source workbook ingestion file. Upload your consolidated spreadsheet master above to launch processing pipelines.")
+        st.info("💡 Awaiting source workbook selection. Choose to run the embedded demo file or upload a custom ledger workbook to activate the analytics pipeline.")
